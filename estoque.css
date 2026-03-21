@@ -69,11 +69,11 @@ body {
 }
 
 /* Destaca itens críticos como 0 ou vazio com fundo vermelho claro */
-.status-danger {
+.status-danger td {
   background-color: #f8d7da;
 }
 
 /* Destaca itens em alerta como quase vazio com fundo laranja claro */
-.status-warning {
+.status-warning td {
   background-color: #fff3cd;
 }
