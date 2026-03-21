@@ -266,7 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (itensEstoque.length === 0) {
       estoqueTabela.innerHTML = `
       <tr>
-      <td colspan="4" class="text-center text-muted">
+      <td colspan="5" class="text-center text-muted">
       Nenhum item cadastrado até o momento.
       </td>
       </tr>
@@ -274,7 +274,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     
-    itensEstoque.forEach(function (item) {
+    itensEstoque.forEach(function (item, indice) {
       const novaLinha = document.createElement("tr");
       
       if (item.quantidade === 0) {
@@ -286,6 +286,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       
       novaLinha.innerHTML = `
+      <td>
+      <button type="button" class="btn btn-sm btn-warning btn-editar" data-indice="${indice}">
+      Editar
+      </button>
+      </td>
       <td>${item.nome}</td>
       <td>${item.unidade}</td>
       <td>${formatarNumero(item.quantidade)}</td>
@@ -293,6 +298,54 @@ document.addEventListener("DOMContentLoaded", function () {
       `;
       
       estoqueTabela.appendChild(novaLinha);
+      const botaoEditar = novaLinha.querySelector(".btn-editar");
+      
+      botaoEditar.addEventListener("click", function () {
+        const itemExistente = itensEstoque[indice];
+        
+        document.getElementById("item-nome").value = itemExistente.nome;
+        document.getElementById("item-quantidade").value = itemExistente.quantidade;
+        
+        const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
+          return option.value === itemExistente.unidade;
+        });
+        
+        if (unidadeExisteNaLista) {
+          campoUnidade.value = itemExistente.unidade;
+          campoUnidadeOutraWrapper.classList.add("d-none");
+          campoUnidadeOutra.required = false;
+          campoUnidadeOutra.value = "";
+        } else {
+          campoUnidade.value = "outro(s)";
+          campoUnidadeOutraWrapper.classList.remove("d-none");
+          campoUnidadeOutra.required = true;
+          campoUnidadeOutra.value = "";
+        }
+        
+        const localizacaoExisteNaLista = Array.from(campoLocalizacao.options).some(function (option) {
+          return option.value === itemExistente.localizacao;
+        });
+          if (!itemExistente.localizacao) {
+            
+            campoLocalizacao.value = "";
+            campoLocalizacaoOutraWrapper.classList.add("d-none");
+            campoLocalizacaoOutra.required = false;
+            campoLocalizacaoOutra.value = "";
+          } else if (localizacaoExisteNaLista) {
+            campoLocalizacao.value = itemExistente.localizacao;
+            campoLocalizacaoOutraWrapper.classList.add("d-none");
+            campoLocalizacaoOutra.required = false;
+            campoLocalizacaoOutra.value = "";
+          } else {
+            campoLocalizacao.value = "outro(s)";
+            campoLocalizacaoOutraWrapper.classList.remove("d-none");
+            campoLocalizacaoOutra.required = true;
+            campoLocalizacaoOutra.value = "";
+          }
+        
+        indiceEdicao = indice;
+        modalBootstrap.show();
+      });
     });
   }
   
