@@ -222,6 +222,45 @@
     </div>
   </footer>
 
+  <!-- Modal de item repetido -->
+  <div
+    class="modal fade"
+    id="modalItemRepetidoCompra"
+    tabindex="-1"
+    aria-labelledby="modalItemRepetidoCompraLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="modalItemRepetidoCompraLabel">Item já adicionado</h2>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Fechar"
+            ></button>
+        </div>
+        
+        <div class="modal-body">
+          Este item já foi adicionado nesta compra. O que deseja fazer?
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="btn-cancelar-item-repetido-compra">
+            Cancelar
+          </button>
+          <button type="button" class="btn btn-warning" id="btn-editar-item-repetido-compra">
+            Editar
+          </button>
+          <button type="button" class="btn btn-danger" id="btn-substituir-item-repetido-compra">
+            Substituir
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="compra.js"></script>
 </body>
