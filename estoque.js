@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Captura os valores digitados/selecionados
     const nome = document.getElementById("item-nome").value.trim();
     let unidade = campoUnidade.value;
-    const quantidade = document.getElementById("item-quantidade").value.trim();
+    const quantidadeTexto = document.getElementById("item-quantidade").value.trim();
     let localizacao = campoLocalizacao.value;
 
     // Se a unidade for "outro(s)", usa o valor digitado manualmente
@@ -89,8 +89,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const quantidade = parseFloat(quantidadeNormalizada);
 
     // Validação básica
-    if (!nome || !unidade || !quantidade || !localizacao) {
-      campoMensagem.textContent = "Preencha todos os campos.";
+    if (!nome || !unidade || isNaN(quantidade)) {
+      campoMensagem.textContent = "Preencha todos os campos corretamente.";
       return;
     }
 
@@ -119,7 +119,10 @@ document.addEventListener("DOMContentLoaded", function () {
       renderizarTabela();
     } else {
       const indiceExistente = itensEstoque.findIndex(function (item) {
-        return item.nome.trim().toLowerCase() === nome.trim().toLowerCase();
+        return (
+          item.nome.trim().toLowerCase() === nome.trim().toLowerCase() &&
+          item.unidade.trim().toLowerCase() === unidade.trim().toLowerCase()
+        );
       });
       
       if (indiceExistente !== -1) {
@@ -150,85 +153,95 @@ document.addEventListener("DOMContentLoaded", function () {
     // Fecha o modal
     modalBootstrap.hide();
   });
+  
+  btnCancelarItemRepetido.addEventListener("click", function () {
+    itemPendente = null;
+    indiceItemRepetido = null;
+    campoMensagem.textContent = "Operação cancelada.";
+    modalItemRepetidoBootstrap.hide();
+  });
+  
+  btnSubstituirItemRepetido.addEventListener("click", function () {
+    if (indiceItemRepetido === null || !itemPendente) {
+      return;
+    }
+    
+    itensEstoque[indiceItemRepetido] = itemPendente;
+    salvarEstoque();
+    renderizarTabela();
+    
+    itemPendente = null;
+    indiceItemRepetido = null;
+    modalItemRepetidoBootstrap.hide();
+    modalBootstrap.hide();
+    estoqueForm.reset();
 
+    campoUnidadeOutraWrapper.classList.add("d-none");
+    campoUnidadeOutra.required = false;
+    campoUnidadeOutra.value = "";
+    
+    campoLocalizacaoOutraWrapper.classList.add("d-none");
+    campoLocalizacaoOutra.required = false;
+    campoLocalizacaoOutra.value = "";
+  });
+  
+  btnEditarItemRepetido.addEventListener("click", function () {
+    if (indiceItemRepetido === null) {
+      return;
+    }
+    
+    const itemExistente = itensEstoque[indiceItemRepetido];
+    
+    document.getElementById("item-nome").value = itemExistente.nome;
+    document.getElementById("item-quantidade").value = itemExistente.quantidade;
+    
+    const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
+      return option.value === itemExistente.unidade;
+    });
+    
+    if (unidadeExisteNaLista) {
+      campoUnidade.value = itemExistente.unidade;
+      campoUnidadeOutraWrapper.classList.add("d-none");
+      campoUnidadeOutra.required = false;
+      campoUnidadeOutra.value = "";
+    } else {
+      campoUnidade.value = "outro(s)";
+      campoUnidadeOutraWrapper.classList.remove("d-none");
+      campoUnidadeOutra.required = true;
+      campoUnidadeOutra.value = "";
+    }
+    
+    const localizacaoExisteNaLista = Array.from(campoLocalizacao.options).some(function (option) {
+      return option.value === itemExistente.localizacao;
+    });
+    
+    if (!itemExistente.localizacao) {
+      campoLocalizacao.value = "";
+      campoLocalizacaoOutraWrapper.classList.add("d-none");
+      campoLocalizacaoOutra.required = false;
+      campoLocalizacaoOutra.value = "";
+    } else if (localizacaoExisteNaLista) {
+      campoLocalizacao.value = itemExistente.localizacao;
+      campoLocalizacaoOutraWrapper.classList.add("d-none");
+      campoLocalizacaoOutra.required = false;
+      campoLocalizacaoOutra.value = "";
+    } else {
+      campoLocalizacao.value = "outro(s)";
+      campoLocalizacaoOutraWrapper.classList.remove("d-none");
+      campoLocalizacaoOutra.required = true;
+      campoLocalizacaoOutra.value = "";
+    }
+    
+    indiceEdicao = indiceItemRepetido;
+
+    
+    itemPendente = null;
+    indiceItemRepetido = null;
+    modalItemRepetidoBootstrap.hide();
+  });
+    
   function carregarEstoque() {
-    btnCancelarItemRepetido.addEventListener("click", function () {
-      itemPendente = null;
-      indiceItemRepetido = null;
-      campoMensagem.textContent = "Operação cancelada.";
-      modalItemRepetidoBootstrap.hide();
-    });
     
-    btnSubstituirItemRepetido.addEventListener("click", function () {
-      if (indiceItemRepetido === null || !itemPendente) {
-        return;
-      }
-      
-      itensEstoque[indiceItemRepetido] = itemPendente;
-      salvarEstoque();
-      renderizarTabela();
-      
-      itemPendente = null;
-      indiceItemRepetido = null;
-      modalItemRepetidoBootstrap.hide();
-      modalBootstrap.hide();
-      estoqueForm.reset();
-    });
-    
-    btnEditarItemRepetido.addEventListener("click", function () {
-      if (indiceItemRepetido === null) {
-        return;
-      }
-      
-      const itemExistente = itensEstoque[indiceItemRepetido];
-      
-      document.getElementById("item-nome").value = itemExistente.nome;
-      document.getElementById("item-quantidade").value = itemExistente.quantidade;
-      
-      const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
-        return option.value === itemExistente.unidade;
-      });
-      
-      if (unidadeExisteNaLista) {
-        campoUnidade.value = itemExistente.unidade;
-        campoUnidadeOutraWrapper.classList.add("d-none");
-        campoUnidadeOutra.required = false;
-        campoUnidadeOutra.value = "";
-      } else {
-        campoUnidade.value = "outro(s)";
-        campoUnidadeOutraWrapper.classList.remove("d-none");
-        campoUnidadeOutra.required = true;
-        campoUnidadeOutra.value = "";
-      }
-      
-      const localizacaoExisteNaLista = Array.from(campoLocalizacao.options).some(function (option) {
-        return option.value === itemExistente.localizacao;
-      });
-      
-      if (!itemExistente.localizacao) {
-        campoLocalizacao.value = "";
-        campoLocalizacaoOutraWrapper.classList.add("d-none");
-        campoLocalizacaoOutra.required = false;
-        campoLocalizacaoOutra.value = "";
-      } else if (localizacaoExisteNaLista) {
-        campoLocalizacao.value = itemExistente.localizacao;
-        campoLocalizacaoOutraWrapper.classList.add("d-none");
-        campoLocalizacaoOutra.required = false;
-        campoLocalizacaoOutra.value = "";
-      } else {
-        campoLocalizacao.value = "outro(s)";
-        campoLocalizacaoOutraWrapper.classList.remove("d-none");
-        campoLocalizacaoOutra.required = true;
-        campoLocalizacaoOutra.value = "";
-      }
-      
-      indiceEdicao = indiceItemRepetido;
-      
-      itemPendente = null;
-      indiceItemRepetido = null;
-      modalItemRepetidoBootstrap.hide();
-    });
-        
     const dadosSalvos = localStorage.getItem(CHAVE_ESTOQUE);
     
     if (!dadosSalvos) {
