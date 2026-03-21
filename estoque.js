@@ -3,6 +3,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Seleciona os elementos principais da página
   const estoqueForm = document.getElementById("estoque-form");
   const estoqueTabela = document.getElementById("estoque-tabela");
+  const campoUnidade = document.getElementById("item-unidade");
+  const campoUnidadeOutraWrapper = document.getElementById("campo-unidade-outra-wrapper");
+  const campoUnidadeOutra = document.getElementById("campo-unidade-outra");
   const campoLocalizacao = document.getElementById("item-localizacao");
   const campoLocalizacaoOutraWrapper = document.getElementById("campo-localizacao-outra-wrapper");
   const campoLocalizacaoOutra = document.getElementById("campo-localizacao-outra");
@@ -15,7 +18,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Observa mudanças no campo de localização
   campoLocalizacao.addEventListener("change", function () {
     // Se a pessoa escolher "outro", mostra o campo manual
-    if (campoLocalizacao.value === "outro") {
+    if (campoLocalizacao.value === "outro(s)") {
       campoLocalizacaoOutraWrapper.classList.remove("d-none");
       campoLocalizacaoOutra.required = true;
     } else {
@@ -36,12 +39,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Captura os valores digitados/selecionados
     const nome = document.getElementById("item-nome").value.trim();
-    const unidade = document.getElementById("item-unidade").value;
+    let unidade = campoUnidade.value;
     const quantidade = document.getElementById("item-quantidade").value;
     let localizacao = campoLocalizacao.value;
 
-    // Se a localização for "outro", usa o valor digitado manualmente
-    if (localizacao === "outro") {
+    // Se a localização for "outro(s)", usa o valor digitado manualmente
+    if (localizacao === "outro(s)") {
       localizacao = campoLocalizacaoOutra.value.trim();
     }
 
@@ -83,6 +86,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Limpa o formulário
     estoqueForm.reset();
+
+    // Esconde novamente o campo manual de unidade
+    campoUnidadeOutraWrapper.classList.add("d-none");
+    campoUnidadeOutra.required = false;
+    campoUnidadeOutra.value = "";
 
     // Esconde novamente o campo de localização manual
     campoLocalizacaoOutraWrapper.classList.add("d-none");
