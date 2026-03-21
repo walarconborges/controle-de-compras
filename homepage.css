@@ -34,3 +34,49 @@ a.text-reset:hover .app-box {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
+
+
+/* Mantém o mapa superior com aparência limpa */
+.site-map-top {
+  background-color: #ffffff;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* Mantém o mapa inferior com aparência limpa */
+.site-map-bottom {
+  background-color: #ffffff;
+  border-top: 1px solid #dee2e6;
+}
+
+/* Estrutura fixa do menu lateral esquerdo */
+.site-map-left {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  z-index: 1040;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Área invisível que detecta a passagem do mouse */
+.site-map-left-hover-area {
+  width: 16px;
+  height: 100%;
+}
+
+/* Conteúdo lateral começa escondido fora da tela */
+.site-map-left-content {
+  width: 220px;
+  height: 100%;
+  background-color: #ffffff;
+  border-right: 1px solid #dee2e6;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+}
+
+/* Mostra o menu lateral ao passar o mouse na área sensível ou no próprio menu */
+.site-map-left:hover .site-map-left-content {
+  transform: translateX(0);
+}
