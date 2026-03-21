@@ -9,18 +9,47 @@
   <link rel="stylesheet" href="homepage.css">
 </head>
 <body>
+  <!-- Mapa do site superior -->
+  <nav class="site-map-top">
+    <div class="container py-2">
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <a href="homepage.html" class="btn btn-primary btn-sm">Home</a>
+        <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+        <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
+        <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+        <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+      </div>
+    </div>
+  </nav>
+  
+  <!-- Mapa do site lateral esquerdo -->
+  <aside class="site-map-left">
+    <div class="site-map-left-hover-area"></div>
+        <div class="site-map-left-content">
+          <div class="p-3">
+            <h2 class="h6 mb-3">Mapa do site</h2>
+            <div class="d-grid gap-2">
+              <a href="homepage.html" class="btn btn-primary btn-sm">Home</a>
+              <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+              <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
+              <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+              <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+            </div>
+          </div>
+        </div>
+  </aside>
   <div class="container py-4">
     <header class="mb-4">
       <h1 class="h3 mb-1">Controle de Compras</h1>
       <p class="text-muted mb-0">Página inicial do sistema</p>
     </header>
-
+    
     <main>
       <section id="home">
         <div class="app-box mb-4">
           <h2 class="h4 mb-3">Home</h2>
           <p>
-            Este sistema foi organizado em três áreas principais: Estoque, Lista e Consumo.
+            Este sistema foi organizado em quatro áreas principais: Estoque, Lista, Compra e Consumo.
           </p>
           <p class="mb-0">
             Clique em uma das opções abaixo para acessar a página correspondente.
@@ -28,7 +57,7 @@
         </div>
 
         <div class="row g-3">
-          <div class="col-md-4">
+          <div class="col-md-6 col-lg-3">
             <a href="estoque.html" class="text-decoration-none text-reset">
               <div class="app-box home-card h-100">
                 <h3 class="h5">Estoque</h3>
@@ -39,7 +68,7 @@
             </a>
           </div>
 
-          <div class="col-md-4">
+          <div class="col-md-6 col-lg-3">
             <a href="lista.html" class="text-decoration-none text-reset">
               <div class="app-box home-card h-100">
                 <h3 class="h5">Lista</h3>
@@ -50,7 +79,7 @@
             </a>
           </div>
 
-          <div class="col-md-4">
+          <div class="col-md-6 col-lg-3">
             <a href="consumo.html" class="text-decoration-none text-reset">
               <div class="app-box home-card h-100">
                 <h3 class="h5">Consumo</h3>
@@ -60,6 +89,17 @@
               </div>
             </a>
           </div>
+
+          <div class="col-md-6 col-lg-3">
+            <a href="compra.html" class="text-decoration-none text-reset">
+              <div class="app-box home-card h-100">
+                <h3 class="h5">Compra</h3>
+                <p class="mb-0">
+                  Registra o que foi comprado de fato e calcula o valor total da compra.
+                </p>
+              </div>
+            </a>
+          </div>       
         </div>
 
         <div class="app-box mt-4">
@@ -68,6 +108,9 @@
             <li>Consultar os itens cadastrados no estoque.</li>
             <li>Marcar manualmente o que deseja comprar na lista.</li>
             <li>Observar com destaque os itens que estiverem com quantidade 0.</li>
+            <li>Consultar os itens cadastrados no estoque.</li>
+            <li>Usar a lista como apoio para o que está faltando.</li>
+            <li>Registrar a compra real na página de compra.</li>
             <li>Usar a página de consumo quando essa parte for implementada.</li>
           </ol>
         </div>
