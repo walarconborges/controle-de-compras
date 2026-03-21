@@ -67,3 +67,13 @@ body {
 .modal .form-label {
   font-weight: 500;
 }
+
+/* Destaca itens críticos como 0 ou vazio com fundo vermelho claro */
+.status-danger {
+  background-color: #f8d7da;
+}
+
+/* Destaca itens em alerta como quase vazio com fundo laranja claro */
+.status-warning {
+  background-color: #fff3cd;
+}
