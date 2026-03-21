@@ -1,0 +1,58 @@
+/* Define a altura mínima da página, a cor de fundo geral
+   e cria espaço na parte inferior para a barra fixa de abas não cobrir o conteúdo */
+body {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  padding-bottom: 90px;
+}
+
+/* Esconde todas as seções da página por padrão */
+.page-section {
+  display: none;
+}
+
+/* Mostra apenas a seção que estiver ativa */
+.page-section.active {
+  display: block;
+}
+
+/* Cria o visual das caixas de conteúdo:
+   fundo branco, borda leve, cantos arredondados, espaçamento interno e sombra suave */
+.app-box {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Adiciona uma faixa azul na lateral esquerda dos cards da Home */
+.home-card {
+  border-left: 4px solid #0d6efd;
+}
+
+/* Fixa a barra de abas no rodapé da tela
+   e define largura total, fundo branco e borda superior */
+.bottom-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  border-top: 1px solid #dee2e6;
+  z-index: 1030;
+}
+
+/* Ajusta o visual dos botões das abas:
+   remove arredondamento, define cor do texto e peso da fonte */
+.bottom-tabs .nav-link {
+  border-radius: 0;
+  color: #495057;
+  font-weight: 500;
+}
+
+/* Destaca a aba atualmente ativa com fundo azul e texto branco */
+.bottom-tabs .nav-link.active {
+  background-color: #0d6efd;
+  color: #ffffff;
+}
