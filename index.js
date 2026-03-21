@@ -1,32 +1,18 @@
-// Espera o HTML da página carregar completamente antes de executar o código
+// Espera o carregamento completo do HTML antes de executar o código
 document.addEventListener("DOMContentLoaded", function () {
-  // Seleciona todos os botões das abas no rodapé
-  const tabButtons = document.querySelectorAll(".bottom-tabs .nav-link");
+  // Seleciona o formulário de login da página
+  const form = document.querySelector("form");
 
-  // Seleciona todas as seções principais da página
-  const pageSections = document.querySelectorAll(".page-section");
+  // Verifica se o formulário existe antes de adicionar o evento
+  if (form) {
+    // Intercepta o envio do formulário
+    form.addEventListener("submit", function (event) {
+      // Impede o recarregamento automático da página
+      event.preventDefault();
 
-  // Percorre cada botão de aba para adicionar o clique
-  tabButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
-      // Pega o nome da página que foi definido no atributo data-page do botão clicado
-      const targetPage = button.getAttribute("data-page");
-
-      // Remove a classe 'active' de todas as abas
-      tabButtons.forEach(function (btn) {
-        btn.classList.remove("active");
-      });
-
-      // Adiciona a classe 'active' apenas na aba clicada
-      button.classList.add("active");
-
-      // Esconde todas as seções removendo a classe 'active'
-      pageSections.forEach(function (section) {
-        section.classList.remove("active");
-      });
-
-      // Mostra apenas a seção correspondente à aba clicada
-      document.getElementById(targetPage).classList.add("active");
+      // Redireciona para a página principal do site
+      // No futuro, aqui será colocada a validação real do login
+      window.location.href = "homepage.html";
     });
-  });
+  }
 });
