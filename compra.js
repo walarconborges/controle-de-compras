@@ -1,6 +1,7 @@
 // Espera o HTML carregar completamente antes de executar o código
 document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_COMPRA = "controleComprasCompraAtual";
+  const CHAVE_ESTOQUE = "controleComprasEstoque";
 
   // Seleciona os elementos principais da página
   const compraForm = document.getElementById("compra-form");
@@ -13,6 +14,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const campoMensagem = document.getElementById("compra-mensagem");
   const modalElement = document.getElementById("modalAdicionarCompra");
+  const btnFinalizarCompra = document.getElementById("btn-finalizar-compra");
 
   const modalItemRepetidoElement = document.getElementById("modalItemRepetidoCompra");
   const btnCancelarItemRepetido = document.getElementById("btn-cancelar-item-repetido-compra");
@@ -90,7 +92,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const indiceExistente = itensCompra.findIndex(function (itemExistente) {
-      return itemExistente.item.trim().toLowerCase() === item.trim().toLowerCase();
+      return (
+        itemExistente.item.trim().toLowerCase() === item.trim().toLowerCase() &&
+        itemExistente.unidade.trim().toLowerCase() === unidade.trim().toLowerCase()
+      );
     });
 
     if (indiceExistente !== -1) {
@@ -162,7 +167,58 @@ document.addEventListener("DOMContentLoaded", function () {
     indiceItemRepetido = null;
     modalItemRepetidoBootstrap.hide();
   });
-
+  
+  btnFinalizarCompra.addEventListener("click", function () {
+    if (itensCompra.length === 0) {
+      campoMensagem.textContent = "Não há itens para finalizar a compra.";
+      return;
+    }
+    
+    const estoqueAtual = carregarEstoque();
+    
+    itensCompra.forEach(function (itemCompra) {
+      const indiceExistenteNoEstoque = estoqueAtual.findIndex(function (itemEstoque) {
+        return (
+          itemEstoque.nome.trim().toLowerCase() === itemCompra.item.trim().toLowerCase() &&
+          itemEstoque.unidade.trim().toLowerCase() === itemCompra.unidade.trim().toLowerCase()
+        );
+      });
+      
+      if (indiceExistenteNoEstoque !== -1) {
+        estoqueAtual[indiceExistenteNoEstoque].quantidade += itemCompra.quantidade;
+      } else {
+        estoqueAtual.push({
+          nome: itemCompra.item,
+          unidade: itemCompra.unidade,
+          quantidade: itemCompra.quantidade,
+          localizacao: ""
+        });
+      }
+    });
+    
+    localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(estoqueAtual));
+    
+    itensCompra = [];
+    salvarCompra();
+    renderizarTabela();
+    campoMensagem.textContent = "Compra finalizada e estoque atualizado.";
+  });
+  
+  function carregarEstoque() {
+    const dadosSalvos = localStorage.getItem(CHAVE_ESTOQUE);
+    
+    if (!dadosSalvos) {
+      return [];
+    }
+    
+    try {
+      return JSON.parse(dadosSalvos);
+    } catch (erro) {
+      console.error("Erro ao carregar estoque:", erro);
+      return [];
+    }
+  }
+  
   function carregarCompra() {
     const dadosSalvos = localStorage.getItem(CHAVE_COMPRA);
 
