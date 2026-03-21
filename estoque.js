@@ -287,9 +287,14 @@ document.addEventListener("DOMContentLoaded", function () {
       
       novaLinha.innerHTML = `
       <td>
+      <div class="d-flex gap-2">
       <button type="button" class="btn btn-sm btn-warning btn-editar" data-indice="${indice}">
       Editar
       </button>
+      <button type="button" class="btn btn-sm btn-danger btn-remover" data-indice="${indice}">
+      Remover
+      </button>
+      </div>
       </td>
       <td>${item.nome}</td>
       <td>${item.unidade}</td>
@@ -299,6 +304,7 @@ document.addEventListener("DOMContentLoaded", function () {
       
       estoqueTabela.appendChild(novaLinha);
       const botaoEditar = novaLinha.querySelector(".btn-editar");
+      const botaoRemover = novaLinha.querySelector(".btn-remover");
       
       botaoEditar.addEventListener("click", function () {
         const itemExistente = itensEstoque[indice];
@@ -345,6 +351,17 @@ document.addEventListener("DOMContentLoaded", function () {
         
         indiceEdicao = indice;
         modalBootstrap.show();
+      });
+      botaoRemover.addEventListener("click", function () {
+        const desejaRemover = confirm("Deseja remover este item do estoque?");
+        
+        if (!desejaRemover) {
+          return;
+        }
+        
+        itensEstoque.splice(indice, 1);
+        salvarEstoque();
+        renderizarTabela();
       });
     });
   }
