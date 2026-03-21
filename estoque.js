@@ -201,35 +201,34 @@ document.addEventListener("DOMContentLoaded", function () {
         campoUnidadeOutra.value = "";
       }
       
-  const localizacaoExisteNaLista = Array.from(campoLocalizacao.options).some(function (option) {
-    return option.value === itemExistente.localizacao;
-  });
-
-  if (!itemExistente.localizacao) {
-    campoLocalizacao.value = "";
-    campoLocalizacaoOutraWrapper.classList.add("d-none");
-    campoLocalizacaoOutra.required = false;
-    campoLocalizacaoOutra.value = "";
-  } else if (localizacaoExisteNaLista) {
-    campoLocalizacao.value = itemExistente.localizacao;
-    campoLocalizacaoOutraWrapper.classList.add("d-none");
-    campoLocalizacaoOutra.required = false;
-    campoLocalizacaoOutra.value = "";
-  } else {
-    campoLocalizacao.value = "outro(s)";
-    campoLocalizacaoOutraWrapper.classList.remove("d-none");
-    campoLocalizacaoOutra.required = true;
-    campoLocalizacaoOutra.value = "";
-  }
-
-  indiceEdicao = indiceItemRepetido;
-
-  itemPendente = null;
-  indiceItemRepetido = null;
-  modalItemRepetidoBootstrap.hide();
-});
-    
-    
+      const localizacaoExisteNaLista = Array.from(campoLocalizacao.options).some(function (option) {
+        return option.value === itemExistente.localizacao;
+      });
+      
+      if (!itemExistente.localizacao) {
+        campoLocalizacao.value = "";
+        campoLocalizacaoOutraWrapper.classList.add("d-none");
+        campoLocalizacaoOutra.required = false;
+        campoLocalizacaoOutra.value = "";
+      } else if (localizacaoExisteNaLista) {
+        campoLocalizacao.value = itemExistente.localizacao;
+        campoLocalizacaoOutraWrapper.classList.add("d-none");
+        campoLocalizacaoOutra.required = false;
+        campoLocalizacaoOutra.value = "";
+      } else {
+        campoLocalizacao.value = "outro(s)";
+        campoLocalizacaoOutraWrapper.classList.remove("d-none");
+        campoLocalizacaoOutra.required = true;
+        campoLocalizacaoOutra.value = "";
+      }
+      
+      indiceEdicao = indiceItemRepetido;
+      
+      itemPendente = null;
+      indiceItemRepetido = null;
+      modalItemRepetidoBootstrap.hide();
+    });
+        
     const dadosSalvos = localStorage.getItem(CHAVE_ESTOQUE);
     
     if (!dadosSalvos) {
