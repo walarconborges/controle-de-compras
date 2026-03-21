@@ -1,5 +1,6 @@
 // Espera o HTML carregar completamente antes de executar o código
 document.addEventListener("DOMContentLoaded", function () {
+  const CHAVE_ESTOQUE = "controleComprasEstoque";
   // Seleciona os elementos principais da página
   const estoqueForm = document.getElementById("estoque-form");
   const estoqueTabela = document.getElementById("estoque-tabela");
@@ -12,8 +13,22 @@ document.addEventListener("DOMContentLoaded", function () {
   const campoMensagem = document.getElementById("estoque-mensagem");
   const modalElement = document.getElementById("modalAdicionarItem");
 
+  const modalItemRepetidoElement = document.getElementById("modalItemRepetido");
+  const btnCancelarItemRepetido = document.getElementById("btn-cancelar-item-repetido");
+  const btnEditarItemRepetido = document.getElementById("btn-editar-item-repetido");
+  const btnSubstituirItemRepetido = document.getElementById("btn-substituir-item-repetido");
+
   // Cria uma instância do modal do Bootstrap para poder fechá-lo via JavaScript
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
+
+  const modalItemRepetidoBootstrap = bootstrap.Modal.getOrCreateInstance(modalItemRepetidoElement);
+  
+  let indiceEdicao = null;
+  let itemPendente = null;
+  let indiceItemRepetido = null;
+  
+  let itensEstoque = carregarEstoque();
+  renderizarTabela();
   
   // Observa mudanças no campo de unidade
   campoUnidade.addEventListener("change", function () {
@@ -90,27 +105,35 @@ document.addEventListener("DOMContentLoaded", function () {
       linhaVazia.parentElement.remove();
     }
 
-    // Cria uma nova linha na tabela
-    const novaLinha = document.createElement("tr");
-
-    // Define a classe de destaque conforme a quantidade
-    let classeDestaque = "";
-
-    if (quantidade === "0") {
-      classeDestaque = "status-danger";
-
-    // Insere o conteúdo da linha
-    novaLinha.className = classeDestaque;
-    novaLinha.innerHTML = `
-      <td>${nome}</td>
-      <td>${unidade}</td>
-      <td>${formatarNumero(quantidade)}</td>
-      <td>${localizacao}</td>
-    `;
-
-    // Adiciona a nova linha na tabela
-    estoqueTabela.appendChild(novaLinha);
-
+    const novoItem = {
+      nome: nome,
+      unidade: unidade,
+      quantidade: quantidade,
+      localizacao: localizacao
+    };
+    
+    if (indiceEdicao !== null) {
+      itensEstoque[indiceEdicao] = novoItem;
+      indiceEdicao = null;
+      salvarEstoque();
+      renderizarTabela();
+    } else {
+      const indiceExistente = itensEstoque.findIndex(function (item) {
+        return item.nome.trim().toLowerCase() === nome.trim().toLowerCase();
+      });
+      
+      if (indiceExistente !== -1) {
+        itemPendente = novoItem;
+        indiceItemRepetido = indiceExistente;
+        modalItemRepetidoBootstrap.show();
+        return;
+      }
+      
+      itensEstoque.push(novoItem);
+      salvarEstoque();
+      renderizarTabela();
+    }
+    
     // Limpa o formulário
     estoqueForm.reset();
 
@@ -128,6 +151,139 @@ document.addEventListener("DOMContentLoaded", function () {
     modalBootstrap.hide();
   });
 
+  function carregarEstoque() {
+    btnCancelarItemRepetido.addEventListener("click", function () {
+      itemPendente = null;
+      indiceItemRepetido = null;
+      campoMensagem.textContent = "Operação cancelada.";
+      modalItemRepetidoBootstrap.hide();
+    });
+    
+    btnSubstituirItemRepetido.addEventListener("click", function () {
+      if (indiceItemRepetido === null || !itemPendente) {
+        return;
+      }
+      
+      itensEstoque[indiceItemRepetido] = itemPendente;
+      salvarEstoque();
+      renderizarTabela();
+      
+      itemPendente = null;
+      indiceItemRepetido = null;
+      modalItemRepetidoBootstrap.hide();
+      modalBootstrap.hide();
+      estoqueForm.reset();
+    });
+    
+    btnEditarItemRepetido.addEventListener("click", function () {
+      if (indiceItemRepetido === null) {
+        return;
+      }
+      
+      const itemExistente = itensEstoque[indiceItemRepetido];
+      
+      document.getElementById("item-nome").value = itemExistente.nome;
+      document.getElementById("item-quantidade").value = itemExistente.quantidade;
+      
+      const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
+        return option.value === itemExistente.unidade;
+      });
+      
+      if (unidadeExisteNaLista) {
+        campoUnidade.value = itemExistente.unidade;
+        campoUnidadeOutraWrapper.classList.add("d-none");
+        campoUnidadeOutra.required = false;
+        campoUnidadeOutra.value = "";
+      } else {
+        campoUnidade.value = "outro(s)";
+        campoUnidadeOutraWrapper.classList.remove("d-none");
+        campoUnidadeOutra.required = true;
+        campoUnidadeOutra.value = "";
+      }
+      
+  const localizacaoExisteNaLista = Array.from(campoLocalizacao.options).some(function (option) {
+    return option.value === itemExistente.localizacao;
+  });
+
+  if (!itemExistente.localizacao) {
+    campoLocalizacao.value = "";
+    campoLocalizacaoOutraWrapper.classList.add("d-none");
+    campoLocalizacaoOutra.required = false;
+    campoLocalizacaoOutra.value = "";
+  } else if (localizacaoExisteNaLista) {
+    campoLocalizacao.value = itemExistente.localizacao;
+    campoLocalizacaoOutraWrapper.classList.add("d-none");
+    campoLocalizacaoOutra.required = false;
+    campoLocalizacaoOutra.value = "";
+  } else {
+    campoLocalizacao.value = "outro(s)";
+    campoLocalizacaoOutraWrapper.classList.remove("d-none");
+    campoLocalizacaoOutra.required = true;
+    campoLocalizacaoOutra.value = "";
+  }
+
+  indiceEdicao = indiceItemRepetido;
+
+  itemPendente = null;
+  indiceItemRepetido = null;
+  modalItemRepetidoBootstrap.hide();
+});
+    
+    
+    const dadosSalvos = localStorage.getItem(CHAVE_ESTOQUE);
+    
+    if (!dadosSalvos) {
+      return [];
+    }
+    
+    try {
+      return JSON.parse(dadosSalvos);
+    } catch (erro) {
+      console.error("Erro ao carregar estoque:", erro);
+      return [];
+    }
+  }
+  
+  function salvarEstoque() {
+    localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(itensEstoque));
+  }
+  
+  function renderizarTabela() {
+    estoqueTabela.innerHTML = "";
+    
+    if (itensEstoque.length === 0) {
+      estoqueTabela.innerHTML = `
+      <tr>
+      <td colspan="4" class="text-center text-muted">
+      Nenhum item cadastrado até o momento.
+      </td>
+      </tr>
+      `;
+      return;
+    }
+    
+    itensEstoque.forEach(function (item) {
+      const novaLinha = document.createElement("tr");
+      
+      if (item.quantidade === 0) {
+        novaLinha.classList.add("status-danger");
+      }
+      
+      if (!item.localizacao || item.localizacao.trim() === "") {
+        novaLinha.classList.add("status-location-empty");
+      }
+      
+      novaLinha.innerHTML = `
+      <td>${item.nome}</td>
+      <td>${item.unidade}</td>
+      <td>${formatarNumero(item.quantidade)}</td>
+      <td>${item.localizacao || ""}</td>
+      `;
+      
+      estoqueTabela.appendChild(novaLinha);
+    });
+  }
+  
   // Formata números no padrão brasileiro
   function formatarNumero(valor) {
     return valor.toLocaleString("pt-BR");
