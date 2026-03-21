@@ -14,10 +14,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Cria uma instância do modal do Bootstrap para poder fechá-lo via JavaScript
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
-
+  
+  // Observa mudanças no campo de unidade
+  campoUnidade.addEventListener("change", function () {
+    // Se a pessoa escolher "outro(s)", mostra o campo manual
+    if (campoUnidade.value === "outro(s)") {
+      campoUnidadeOutraWrapper.classList.remove("d-none");
+      campoUnidadeOutra.required = true;
+    } else {
+      // Se escolher qualquer outra opção, esconde o campo manual
+      campoUnidadeOutraWrapper.classList.add("d-none");
+      campoUnidadeOutra.required = false;
+      campoUnidadeOutra.value = "";
+    }
+  });
+  
   // Observa mudanças no campo de localização
   campoLocalizacao.addEventListener("change", function () {
-    // Se a pessoa escolher "outro", mostra o campo manual
+    // Se a pessoa escolher "outro(s)", mostra o campo manual
     if (campoLocalizacao.value === "outro(s)") {
       campoLocalizacaoOutraWrapper.classList.remove("d-none");
       campoLocalizacaoOutra.required = true;
@@ -42,6 +56,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let unidade = campoUnidade.value;
     const quantidade = document.getElementById("item-quantidade").value;
     let localizacao = campoLocalizacao.value;
+
+    // Se a unidade for "outro(s)", usa o valor digitado manualmente
+    if (unidade === "outro(s)") {
+      unidade = campoUnidadeOutra.value.trim();
+    }
 
     // Se a localização for "outro(s)", usa o valor digitado manualmente
     if (localizacao === "outro(s)") {
