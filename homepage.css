@@ -17,6 +17,7 @@ body {
 /* Adiciona uma faixa azul na lateral esquerda dos cards principais da Home */
 .home-card {
   border-left: 4px solid #0d6efd;
+  min-height: 180px;
 }
 
 /* Faz o card continuar com a mesma cor do texto, sem aparência de link padrão */
