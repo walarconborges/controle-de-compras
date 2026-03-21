@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Captura os valores digitados/selecionados
     const nome = document.getElementById("item-nome").value.trim();
     let unidade = campoUnidade.value;
-    const quantidade = document.getElementById("item-quantidade").value;
+    const quantidade = document.getElementById("item-quantidade").value.trim();
     let localizacao = campoLocalizacao.value;
 
     // Se a unidade for "outro(s)", usa o valor digitado manualmente
@@ -67,9 +67,20 @@ document.addEventListener("DOMContentLoaded", function () {
       localizacao = campoLocalizacaoOutra.value.trim();
     }
 
+    // Troca vírgula por ponto para aceitar os dois formatos
+    const quantidadeNormalizada = quantidadeTexto.replace(",", ".");
+    
+    // Converte para número
+    const quantidade = parseFloat(quantidadeNormalizada);
+
     // Validação básica
     if (!nome || !unidade || !quantidade || !localizacao) {
       campoMensagem.textContent = "Preencha todos os campos.";
+      return;
+    }
+
+    if (quantidade < 0) {
+      campoMensagem.textContent = "A quantidade não pode ser negativa.";
       return;
     }
 
@@ -85,18 +96,15 @@ document.addEventListener("DOMContentLoaded", function () {
     // Define a classe de destaque conforme a quantidade
     let classeDestaque = "";
 
-    if (quantidade === "0" || quantidade === "vazio") {
+    if (quantidade === "0") {
       classeDestaque = "status-danger";
-    } else if (quantidade === "quase vazio") {
-      classeDestaque = "status-warning";
-    }
 
     // Insere o conteúdo da linha
     novaLinha.className = classeDestaque;
     novaLinha.innerHTML = `
       <td>${nome}</td>
       <td>${unidade}</td>
-      <td>${quantidade}</td>
+      <td>${formatarNumero(quantidade)}</td>
       <td>${localizacao}</td>
     `;
 
@@ -119,4 +127,9 @@ document.addEventListener("DOMContentLoaded", function () {
     // Fecha o modal
     modalBootstrap.hide();
   });
+
+  // Formata números no padrão brasileiro
+  function formatarNumero(valor) {
+    return valor.toLocaleString("pt-BR");
+  }
 });
