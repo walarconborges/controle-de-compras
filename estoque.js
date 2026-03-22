@@ -1,6 +1,8 @@
 // Espera o HTML carregar completamente antes de executar o código
 document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_ESTOQUE = "controleComprasEstoque";
+  const CHAVE_MOVIMENTACOES_ESTOQUE = "controleComprasMovimentacoesEstoque";
+  
   // Seleciona os elementos principais da página
   const estoqueForm = document.getElementById("estoque-form");
   const estoqueTabela = document.getElementById("estoque-tabela");
@@ -130,7 +132,9 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     
     if (indiceEdicao !== null) {
+      const quantidadeAnterior = Number(itensEstoque[indiceEdicao].quantidade);
       itensEstoque[indiceEdicao] = novoItem;
+      registrarMovimentacaoEstoque("edicao", novoItem, quantidadeAnterior, novoItem.quantidade);
       indiceEdicao = null;
       salvarEstoque();
       renderizarTabela();
@@ -150,6 +154,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       
       itensEstoque.push(novoItem);
+      registrarMovimentacaoEstoque("cadastro", novoItem, 0, novoItem.quantidade);
       salvarEstoque();
       renderizarTabela();
     }
@@ -183,7 +188,9 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     
+    const quantidadeAnterior = Number(itensEstoque[indiceItemRepetido].quantidade);
     itensEstoque[indiceItemRepetido] = itemPendente;
+    registrarMovimentacaoEstoque("substituicao", itemPendente, quantidadeAnterior, itemPendente.quantidade);
     salvarEstoque();
     renderizarTabela();
     
@@ -322,7 +329,8 @@ document.addEventListener("DOMContentLoaded", function () {
       </button>
       
           <input
-          type="number"
+          type="text"
+          inputmode="decimal"
           class="form-control form-control-sm campo-quantidade"
           data-indice="${indice}"
           value="${item.quantidade}"
@@ -391,6 +399,7 @@ document.addEventListener("DOMContentLoaded", function () {
         indiceEdicao = indice;
         modalBootstrap.show();
       });
+      
       botaoRemover.addEventListener("click", function () {
         const desejaRemover = confirm("Deseja remover este item do estoque?");
         
@@ -398,34 +407,40 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
         
+        const itemRemovido = itensEstoque[indice];
+        registrarMovimentacaoEstoque("remocao", itemRemovido, itemRemovido.quantidade, 0);
+        
         itensEstoque.splice(indice, 1);
         salvarEstoque();
         renderizarTabela();
       });
-
+      
       botaoDiminuir.addEventListener("click", function () {
-        let quantidadeAtual = parseFloat(itensEstoque[indice].quantidade);
-        if (isNaN(quantidadeAtual)) {
-          quantidadeAtual = 0;
+        let quantidadeAnterior = parseFloat(itensEstoque[indice].quantidade);
+        
+        if (isNaN(quantidadeAnterior)) {
+          quantidadeAnterior = 0;
         }
         
-        quantidadeAtual = Math.max(0, quantidadeAtual - 1);
-        itensEstoque[indice].quantidade = quantidadeAtual;
+        let quantidadeNova = Math.max(0, quantidadeAnterior - 1);
+        itensEstoque[indice].quantidade = quantidadeNova;
         
+        registrarMovimentacaoEstoque("ajuste", itensEstoque[indice], quantidadeAnterior, quantidadeNova);
         salvarEstoque();
         renderizarTabela();
       });
       
       botaoAumentar.addEventListener("click", function () {
-        let quantidadeAtual = parseFloat(itensEstoque[indice].quantidade);
+        let quantidadeAnterior = parseFloat(itensEstoque[indice].quantidade);
         
-        if (isNaN(quantidadeAtual)) {
-          quantidadeAtual = 0;
+        if (isNaN(quantidadeAnterior)) {
+          quantidadeAnterior = 0;
         }
         
-        quantidadeAtual = quantidadeAtual + 1;
-        itensEstoque[indice].quantidade = quantidadeAtual;
+        let quantidadeNova = quantidadeAnterior + 1;
+        itensEstoque[indice].quantidade = quantidadeNova;
         
+        registrarMovimentacaoEstoque("ajuste", itensEstoque[indice], quantidadeAnterior, quantidadeNova);
         salvarEstoque();
         renderizarTabela();
       });
@@ -438,12 +453,50 @@ document.addEventListener("DOMContentLoaded", function () {
           novaQuantidade = 0;
         }
         
+        const quantidadeAnterior = Number(itensEstoque[indice].quantidade);
         itensEstoque[indice].quantidade = novaQuantidade;
         
+        registrarMovimentacaoEstoque("ajuste", itensEstoque[indice], quantidadeAnterior, novaQuantidade);
         salvarEstoque();
         renderizarTabela();
       });
     });
+  }
+  
+  function carregarMovimentacoesEstoque() {
+    const dadosSalvos = localStorage.getItem(CHAVE_MOVIMENTACOES_ESTOQUE);
+    
+    if (!dadosSalvos) {
+      return [];
+    }
+    
+    try {
+      return JSON.parse(dadosSalvos);
+    } catch (erro) {
+      console.error("Erro ao carregar movimentações do estoque:", erro);
+      return [];
+    }
+  }
+  
+  function salvarMovimentacoesEstoque(movimentacoes) {
+    localStorage.setItem(CHAVE_MOVIMENTACOES_ESTOQUE, JSON.stringify(movimentacoes));
+  }
+  
+  function registrarMovimentacaoEstoque(tipo, item, quantidadeAnterior, quantidadeNova) {
+    const movimentacoes = carregarMovimentacoesEstoque();
+    
+    movimentacoes.push({
+      data: new Date().toISOString(),
+      tipo: tipo,
+      nome: item.nome,
+      unidade: item.unidade,
+      localizacao: item.localizacao || "",
+      quantidadeAnterior: Number(quantidadeAnterior),
+      quantidadeNova: Number(quantidadeNova),
+      variacao: Number(quantidadeNova) - Number(quantidadeAnterior)
+    });
+    
+    salvarMovimentacoesEstoque(movimentacoes);
   }
   
   // Formata números no padrão brasileiro
