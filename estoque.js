@@ -117,7 +117,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Remove a mensagem de tabela vazia, se ela ainda existir
-    const linhaVazia = estoqueTabela.querySelector("td[colspan='4']");
+    const linhaVazia = estoqueTabela.querySelector("td[colspan='5']");
     if (linhaVazia) {
       linhaVazia.parentElement.remove();
     }
