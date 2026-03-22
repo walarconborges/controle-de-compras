@@ -25,15 +25,15 @@ body {
   border-top: 1px solid #dee2e6;
 }
 
-/* Estrutura fixa do menu lateral esquerdo */
+/* Estrutura fixa do menu lateral esquerdo.
+   Largura restrita à faixa sensível. */
 .site-map-left {
   position: fixed;
   top: 0;
   left: 0;
-  height: 100%;
+  width: 16px;
+  height: 100vh;
   z-index: 1040;
-  display: flex;
-  align-items: stretch;
 }
 
 /* Área invisível que detecta a passagem do mouse */
@@ -44,8 +44,11 @@ body {
 
 /* Conteúdo lateral começa escondido fora da tela */
 .site-map-left-content {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 220px;
-  height: 100%;
+  height: 100vh;
   background-color: #ffffff;
   border-right: 1px solid #dee2e6;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
@@ -53,9 +56,11 @@ body {
   transition: transform 0.25s ease;
 }
 
-/* Mostra o menu lateral ao passar o mouse na área sensível ou no próprio menu */
-.site-map-left:hover .site-map-left-content {
-  transform: translateX(0);
+/* Só abre por hover em dispositivos com mouse real */
+@media (hover: hover) and (pointer: fine) {
+  .site-map-left:hover .site-map-left-content {
+    transform: translateX(0);
+  }
 }
 
 /* Melhora a visualização da tabela em telas pequenas */
