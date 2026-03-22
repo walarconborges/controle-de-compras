@@ -1,84 +1,55 @@
-/* Define a altura mínima da página e a cor de fundo geral */
-body {
-  min-height: 100vh;
-  background-color: #f8f9fa;
-}
+document.addEventListener("DOMContentLoaded", function () {
+  const loginForm = document.getElementById("login-form");
+  const emailInput = document.getElementById("email");
+  const senhaInput = document.getElementById("senha");
+  const loginMessage = document.getElementById("login-message");
+  const authTokenInput = document.getElementById("auth-token");
 
-/* Cria o visual padrão das caixas de conteúdo */
-.app-box {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-/* Mantém o mapa superior com aparência limpa */
-.site-map-top {
-  background-color: #ffffff;
-  border-bottom: 1px solid #dee2e6;
-}
-
-/* Mantém o mapa inferior com aparência limpa */
-.site-map-bottom {
-  background-color: #ffffff;
-  border-top: 1px solid #dee2e6;
-}
-
-/* Estrutura fixa do menu lateral esquerdo.
-   Largura restrita à faixa sensível. */
-.site-map-left {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 16px;
-  height: 100vh;
-  z-index: 1040;
-}
-
-/* Área invisível que detecta a passagem do mouse */
-.site-map-left-hover-area {
-  width: 16px;
-  height: 100%;
-}
-
-/* Conteúdo lateral começa escondido fora da tela */
-.site-map-left-content {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 220px;
-  height: 100vh;
-  background-color: #ffffff;
-  border-right: 1px solid #dee2e6;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
-  transform: translateX(-100%);
-  transition: transform 0.25s ease;
-}
-
-/* Só abre por hover em dispositivos com mouse real */
-@media (hover: hover) and (pointer: fine) {
-  .site-map-left:hover .site-map-left-content {
-    transform: translateX(0);
+  if (!loginForm || !emailInput || !senhaInput || !loginMessage || !authTokenInput) {
+    return;
   }
-}
 
-/* Melhora a visualização da tabela em telas pequenas */
-.table-responsive {
-  overflow-x: auto;
-}
+  loginForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    limparMensagemLogin();
 
-/* Dá melhor alinhamento visual aos campos do modal */
-.modal .form-label {
-  font-weight: 500;
-}
+    const email = emailInput.value.trim();
+    const senha = senhaInput.value.trim();
 
-/* Destaca itens com quantidade 0 */
-.status-danger td {
-  background-color: #f8d7da;
-}
+    if (!email || !senha) {
+      exibirMensagemLogin("Preencha e-mail e senha.");
+      return;
+    }
 
-/* Destaca itens sem localização */
-.status-location-empty td {
-  background-color: #f8d7da;
-}
+    if (!validarEmail(email)) {
+      exibirMensagemLogin("Digite um e-mail válido.");
+      return;
+    }
+
+    processarLogin(email, senha);
+  });
+
+  function processarLogin(email, senha) {
+    const loginSucesso = Boolean(email && senha);
+
+    if (loginSucesso) {
+      authTokenInput.value = "";
+      window.location.href = "homepage.html";
+      return;
+    }
+
+    exibirMensagemLogin("E-mail ou senha inválidos.");
+  }
+
+  function validarEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  function exibirMensagemLogin(mensagem) {
+    loginMessage.textContent = mensagem;
+  }
+
+  function limparMensagemLogin() {
+    loginMessage.textContent = "";
+  }
+});
