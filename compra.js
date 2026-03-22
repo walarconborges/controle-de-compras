@@ -23,6 +23,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Cria instâncias dos modais do Bootstrap
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
+
+  modalElement.addEventListener("hidden.bs.modal", function () {
+    compraForm.reset();
+    
+    campoUnidadeOutraWrapper.classList.add("d-none");
+    campoUnidadeOutra.required = false;
+    campoUnidadeOutra.value = "";
+    
+    campoMensagem.textContent = "";
+    indiceEdicao = null;
+    itemPendente = null;
+    indiceItemRepetido = null;
+  });
+    
   const modalItemRepetidoBootstrap = bootstrap.Modal.getOrCreateInstance(modalItemRepetidoElement);
 
   let itensCompra = carregarCompra();
