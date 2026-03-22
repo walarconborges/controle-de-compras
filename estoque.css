@@ -82,3 +82,7 @@ body {
 .status-location-empty td {
   background-color: #f8d7da;
 }
+
+.campo-quantidade {
+  min-width: 90px;
+}
