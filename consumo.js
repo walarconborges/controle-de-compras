@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", function () {
   
   const resultadoConsumoContainer = document.getElementById("resultado-consumo");
   const resultadoComprasContainer = document.getElementById("resultado-compras");
+
+  let graficoCompras = null;
+  let graficoConsumo = null;
   
   if (!visualizacaoConsumo || !visualizacaoCompras || !resultadoConsumoContainer || !resultadoComprasContainer) {
     console.error("Estrutura HTML das visualizações de consumo/compras não encontrada.");
@@ -67,30 +70,35 @@ document.addEventListener("DOMContentLoaded", function () {
     const modo = visualizacaoCompras.value;
     
     if (historico.length === 0) {
+        if (graficoCompras) {
+          graficoCompras.destroy();
+          graficoCompras = null;
+        }
+      
       resultadoComprasContainer.innerHTML = `
-      <div class="table-responsive">
-      <table class="table table-bordered table-hover align-middle mb-0">
-      <thead class="table-light">
-      <tr>
-      <th>Data da compra</th>
-      <th>Total da compra</th>
-      <th>Quantidade de itens</th>
-      <th>Média por compra</th>
-      <th>Média por item</th>
-      </tr>
-      </thead>
-      <tbody>
-      <tr>
-      <td colspan="5" class="text-center text-muted">
-      Nenhum dado de compra disponível até o momento.
-      </td>
-      </tr>
-      </tbody>
-      </table>
-      </div>
-      `;
-      return;
-    }
+        <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle mb-0">
+        <thead class="table-light">
+        <tr>
+        <th>Data da compra</th>
+        <th>Total da compra</th>
+        <th>Quantidade de itens</th>
+        <th>Média por compra</th>
+        <th>Média por item</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td colspan="5" class="text-center text-muted">
+        Nenhum dado de compra disponível até o momento.
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+        `;
+        return;
+        }
     
     if (modo === "tabela") {
       renderizarComprasTabela(historico);
@@ -101,7 +109,7 @@ document.addEventListener("DOMContentLoaded", function () {
       renderizarComprasLista(historico);
       return;
     }
-    
+                
     if (modo === "barras") {
       renderizarComprasBarras(historico);
       return;
@@ -144,6 +152,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const modo = visualizacaoConsumo.value;
     
     if (consumos.length === 0) {
+        if (graficoConsumo) {
+          graficoConsumo.destroy();
+          graficoConsumo = null;
+        }
       resultadoConsumoContainer.innerHTML = `
       <div class="table-responsive">
       <table class="table table-bordered table-hover align-middle mb-0">
@@ -262,26 +274,30 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarComprasTabela(historico) {
-  let linhas = "";
-
-  historico.forEach(function (compra) {
-    const mediaPorCompra = Number(compra.total) || 0;
-    const mediaPorItem = Number(compra.quantidadeItens) > 0
-      ? Number(compra.total) / Number(compra.quantidadeItens)
-      : 0;
-
-    linhas += `
+      if (graficoCompras) {
+        graficoCompras.destroy();
+        graficoCompras = null;
+      }
+    let linhas = "";
+    
+    historico.forEach(function (compra) {
+      const mediaPorCompra = Number(compra.total) || 0;
+      const mediaPorItem = Number(compra.quantidadeItens) > 0
+        ? Number(compra.total) / Number(compra.quantidadeItens)
+        : 0;
+      
+      linhas += `
       <tr>
-        <td>${formatarData(compra.data)}</td>
-        <td>R$ ${formatarMoeda(compra.total)}</td>
-        <td>${compra.quantidadeItens}</td>
-        <td>R$ ${formatarMoeda(mediaPorCompra)}</td>
-        <td>R$ ${formatarMoeda(mediaPorItem)}</td>
+      <td>${formatarData(compra.data)}</td>
+      <td>R$ ${formatarMoeda(compra.total)}</td>
+      <td>${compra.quantidadeItens}</td>
+      <td>R$ ${formatarMoeda(mediaPorCompra)}</td>
+      <td>R$ ${formatarMoeda(mediaPorItem)}</td>
       </tr>
-    `;
-  });
-
-  resultadoComprasContainer.innerHTML = `
+      `;
+    });
+    
+    resultadoComprasContainer.innerHTML = `
     <div class="table-responsive">
       <table class="table table-bordered table-hover align-middle mb-0">
         <thead class="table-light">
@@ -300,6 +316,11 @@ document.addEventListener("DOMContentLoaded", function () {
 }
 
 function renderizarComprasLista(historico) {
+  if (graficoCompras) {
+    graficoCompras.destroy();
+    graficoCompras = null;
+  }
+  
   const blocos = historico.map(function (compra) {
     const mediaPorItem = Number(compra.quantidadeItens) > 0
       ? Number(compra.total) / Number(compra.quantidadeItens)
@@ -319,79 +340,165 @@ function renderizarComprasLista(historico) {
 }
 
 function renderizarComprasBarras(historico) {
-  const maiorValor = Math.max.apply(null, historico.map(function (compra) {
+  const labels = historico.map(function (compra) {
+    return formatarData(compra.data);
+  });
+
+  const valores = historico.map(function (compra) {
     return Number(compra.total) || 0;
-  }));
+  });
 
-  const blocos = historico.map(function (compra) {
-    const total = Number(compra.total) || 0;
-    const largura = maiorValor > 0 ? (total / maiorValor) * 100 : 0;
+  resultadoComprasContainer.innerHTML = `
+    <div class="p-3 bg-white rounded">
+      <canvas id="grafico-compras-barras"></canvas>
+    </div>
+  `;
 
-    return `
-      <div class="mb-3">
-        <div class="d-flex justify-content-between mb-1">
-          <span>${formatarData(compra.data)}</span>
-          <span>R$ ${formatarMoeda(total)}</span>
-        </div>
-        <div class="progress" role="progressbar" aria-valuenow="${largura}" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar" style="width: ${largura}%"></div>
-        </div>
-      </div>
-    `;
-  }).join("");
+  const canvas = document.getElementById("grafico-compras-barras");
 
-  resultadoComprasContainer.innerHTML = `<div>${blocos}</div>`;
+  if (!canvas) {
+    return;
+  }
+
+  if (graficoCompras) {
+    graficoCompras.destroy();
+    graficoCompras = null;
+  }
+
+  graficoCompras = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Total das compras",
+          data: valores
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  canvas.parentElement.style.height = "320px";
 }
 
 function renderizarComprasPizza(historico) {
-  const totalGeral = historico.reduce(function (acumulado, compra) {
-    return acumulado + (Number(compra.total) || 0);
-  }, 0);
+  const labels = historico.map(function (compra) {
+    return formatarData(compra.data);
+  });
 
-  const itens = historico.map(function (compra) {
-    const total = Number(compra.total) || 0;
-    const percentual = totalGeral > 0 ? (total / totalGeral) * 100 : 0;
-
-    return `
-      <tr>
-        <td>${formatarData(compra.data)}</td>
-        <td>R$ ${formatarMoeda(total)}</td>
-        <td>${formatarNumero(percentual)}%</td>
-      </tr>
-    `;
-  }).join("");
+  const valores = historico.map(function (compra) {
+    return Number(compra.total) || 0;
+  });
 
   resultadoComprasContainer.innerHTML = `
-    <div class="table-responsive">
-      <table class="table table-bordered table-hover align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Data da compra</th>
-            <th>Total</th>
-            <th>Participação no total</th>
-          </tr>
-        </thead>
-        <tbody>${itens}</tbody>
-      </table>
+    <div class="p-3 bg-white rounded">
+      <canvas id="grafico-compras-pizza"></canvas>
     </div>
   `;
+
+  const canvas = document.getElementById("grafico-compras-pizza");
+
+  if (!canvas) {
+    return;
+  }
+
+  if (graficoCompras) {
+    graficoCompras.destroy();
+    graficoCompras = null;
+  }
+
+  graficoCompras = new Chart(canvas, {
+    type: "pie",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Participação das compras",
+          data: valores
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false
+    }
+  });
+
+  canvas.parentElement.style.height = "320px";
 }
 
 function renderizarComprasLinhaDoTempo(historico) {
-  const blocos = historico.map(function (compra) {
-    return `
-      <div class="border-start ps-3 ms-2 mb-3">
-        <div><strong>${formatarData(compra.data)}</strong></div>
-        <div>Total: R$ ${formatarMoeda(compra.total)}</div>
-        <div>Itens: ${compra.quantidadeItens}</div>
-      </div>
-    `;
-  }).join("");
+  const historicoOrdenado = historico.slice().sort(function (a, b) {
+    return new Date(a.data) - new Date(b.data);
+  });
 
-  resultadoComprasContainer.innerHTML = blocos;
+  const labels = historicoOrdenado.map(function (compra) {
+    return formatarData(compra.data);
+  });
+
+  const valores = historicoOrdenado.map(function (compra) {
+    return Number(compra.total) || 0;
+  });
+
+  resultadoComprasContainer.innerHTML = `
+    <div class="p-3 bg-white rounded">
+      <canvas id="grafico-compras-linha-tempo"></canvas>
+    </div>
+  `;
+
+  const canvas = document.getElementById("grafico-compras-linha-tempo");
+
+  if (!canvas) {
+    return;
+  }
+
+  if (graficoCompras) {
+    graficoCompras.destroy();
+    graficoCompras = null;
+  }
+
+  graficoCompras = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Evolução das compras",
+          data: valores,
+          fill: false,
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  canvas.parentElement.style.height = "320px";
 }
 
 function renderizarConsumoTabela(dados) {
+  if (graficoConsumo) {
+    graficoConsumo.destroy();
+    graficoConsumo = null;
+  }
+  
   const linhas = dados.map(function (grupo) {
     return `
       <tr>
@@ -429,6 +536,11 @@ function renderizarConsumoTabela(dados) {
 }
 
 function renderizarConsumoLista(dados) {
+  if (graficoConsumo) {
+    graficoConsumo.destroy();
+    graficoConsumo = null;
+  }
+  
   const blocos = dados.map(function (grupo) {
     return `
       <div class="border rounded p-3 mb-3">
@@ -446,62 +558,130 @@ function renderizarConsumoLista(dados) {
 }
 
 function renderizarConsumoBarras(dados) {
-  const maiorValor = Math.max.apply(null, dados.map(function (grupo) {
+  const labels = dados.map(function (grupo) {
+    return `${grupo.nome} (${grupo.unidade})`;
+  });
+
+  const valores = dados.map(function (grupo) {
     return Number(grupo.consumoTotal) || 0;
-  }));
+  });
 
-  const blocos = dados.map(function (grupo) {
-    const largura = maiorValor > 0 ? (grupo.consumoTotal / maiorValor) * 100 : 0;
+  resultadoConsumoContainer.innerHTML = `
+    <div class="p-3 bg-white rounded">
+      <canvas id="grafico-consumo-barras"></canvas>
+    </div>
+  `;
 
-    return `
-      <div class="mb-3">
-        <div class="d-flex justify-content-between mb-1">
-          <span>${grupo.nome} (${grupo.unidade})</span>
-          <span>${formatarNumero(grupo.consumoTotal)}</span>
-        </div>
-        <div class="progress" role="progressbar" aria-valuenow="${largura}" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar" style="width: ${largura}%"></div>
-        </div>
-      </div>
-    `;
-  }).join("");
+  const canvas = document.getElementById("grafico-consumo-barras");
 
-  resultadoConsumoContainer.innerHTML = `<div>${blocos}</div>`;
+  if (!canvas) {
+    return;
+  }
+
+  if (graficoConsumo) {
+    graficoConsumo.destroy();
+    graficoConsumo = null;
+  }
+
+  graficoConsumo = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Consumo total",
+          data: valores
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  canvas.parentElement.style.height = "320px";
 }
 
 function renderizarConsumoLinhaDoTempo(dados) {
-  const blocos = dados.map(function (grupo) {
-    return `
-      <div class="border-start ps-3 ms-2 mb-3">
-        <div><strong>${grupo.nome}</strong> (${grupo.unidade})</div>
-        <div>Data inicial: ${formatarData(grupo.dataInicial)}</div>
-        <div>Data final: ${formatarData(grupo.dataFinal)}</div>
-        <div>Consumo total: ${formatarNumero(grupo.consumoTotal)}</div>
-        <div>Ocorrências: ${grupo.ocorrencias}</div>
-      </div>
-    `;
-  }).join("");
+  const dadosOrdenados = dados.slice().sort(function (a, b) {
+    return new Date(a.dataFinal) - new Date(b.dataFinal);
+  });
 
-  resultadoConsumoContainer.innerHTML = blocos;
+  const labels = dadosOrdenados.map(function (grupo) {
+    return formatarData(grupo.dataFinal);
+  });
+
+  const valores = dadosOrdenados.map(function (grupo) {
+    return Number(grupo.consumoTotal) || 0;
+  });
+
+  resultadoConsumoContainer.innerHTML = `
+    <div class="p-3 bg-white rounded">
+      <canvas id="grafico-consumo-linha-tempo"></canvas>
+    </div>
+  `;
+
+  const canvas = document.getElementById("grafico-consumo-linha-tempo");
+
+  if (!canvas) {
+    return;
+  }
+
+  if (graficoConsumo) {
+    graficoConsumo.destroy();
+    graficoConsumo = null;
+  }
+
+  graficoConsumo = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Evolução do consumo",
+          data: valores,
+          fill: false,
+          tension: 0.2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  canvas.parentElement.style.height = "320px";
 }
   
   function formatarData(valor) {
     const data = valor instanceof Date ? valor : new Date(valor);
-
+    
     if (isNaN(data.getTime())) {
       return "-";
     }
-
+    
     return data.toLocaleDateString("pt-BR");
   }
-
+  
   function formatarNumero(valor) {
     return Number(valor).toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     });
   }
-
+  
   function formatarMoeda(valor) {
     return Number(valor).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
