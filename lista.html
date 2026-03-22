@@ -9,31 +9,54 @@
   <link rel="stylesheet" href="lista.css">
 </head>
 <body>
-  <!-- Mapa do site superior -->
-  <nav class="site-map-top">
-    <div class="container py-2">
-      <div class="d-flex flex-wrap gap-2 justify-content-center">
-        <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-        <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-        <a href="lista.html" class="btn btn-primary btn-sm">Lista</a>
-        <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-        <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-      </div>
-    </div>
-  </nav>
+  <header>
+    <nav class="site-map-top">
+      <div class="container py-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm d-lg-none"
+            id="btn-menu-mobile"
+            aria-label="Abrir menu de navegação"
+            aria-controls="menu-lateral-lista"
+            aria-expanded="false"
+          >
+            ☰ Menu
+          </button>
 
-  <!-- Mapa do site lateral esquerdo -->
-  <aside class="site-map-left">
-    <div class="site-map-left-hover-area"></div>
+          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
+          <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+          <a href="lista.html" class="btn btn-primary btn-sm" aria-current="page">Lista</a>
+          <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <aside class="site-map-left" id="menu-lateral-lista" aria-label="Menu lateral">
+    <div class="site-map-left-hover-area" aria-hidden="true"></div>
 
     <div class="site-map-left-content">
       <div class="p-3">
-        <h2 class="h6 mb-3">Mapa do site</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3 d-lg-none">
+          <h2 class="h6 mb-0">Mapa do site</h2>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="btn-fechar-menu-mobile"
+            aria-label="Fechar menu de navegação"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <h2 class="h6 mb-3 d-none d-lg-block">Mapa do site</h2>
 
         <div class="d-grid gap-2">
           <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
           <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-          <a href="lista.html" class="btn btn-primary btn-sm">Lista</a>
+          <a href="lista.html" class="btn btn-primary btn-sm" aria-current="page">Lista</a>
           <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
           <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
         </div>
@@ -41,46 +64,53 @@
     </div>
   </aside>
 
+  <div
+    class="menu-mobile-backdrop d-lg-none"
+    id="menu-mobile-backdrop"
+    hidden
+    aria-hidden="true"
+  ></div>
+
   <div class="container py-4">
-    <header class="mb-4">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h1 class="h3 mb-1">Lista</h1>
-          <p class="text-muted mb-0">Organize o que precisa comprar.</p>
-        </div>
-
-        <button
-          type="button"
-          class="btn btn-primary"
-          data-bs-toggle="modal"
-          data-bs-target="#modalAdicionarItemLista"
-        >
-          Adicionar item
-        </button>
-      </div>
-    </header>
-
     <main>
-      <section class="app-box mb-4">
-        <h2 class="h4 mb-3">Orientação</h2>
+      <header class="mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h1 class="h3 mb-1">Lista</h1>
+            <p class="text-muted mb-0">Organize o que precisa comprar.</p>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#modalAdicionarItemLista"
+          >
+            Adicionar item
+          </button>
+        </div>
+      </header>
+
+      <section class="app-box mb-4" aria-labelledby="orientacao-lista-titulo">
+        <h2 class="h4 mb-3" id="orientacao-lista-titulo">Orientação</h2>
         <p class="mb-0">
           Esta página mostra os itens do estoque, com prioridade para os que estão com quantidade 0.
           Também é possível adicionar um item novo diretamente na lista. Nesse caso, ele será criado no estoque com quantidade 0 e categoria vazia.
         </p>
       </section>
 
-      <section class="app-box">
-        <h2 class="h4 mb-3">Itens da lista</h2>
+      <section class="app-box" aria-labelledby="itens-lista-titulo">
+        <h2 class="h4 mb-3" id="itens-lista-titulo">Itens da lista</h2>
 
         <div class="table-responsive">
           <table class="table table-bordered table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th>Comprar</th>
-                <th>Item</th>
-                <th>Unidade</th>
-                <th>Quantidade atual</th>
-                <th>Categoria</th>
+                <th scope="col">Comprar</th>
+                <th scope="col">Item</th>
+                <th scope="col">Unidade</th>
+                <th scope="col">Quantidade atual</th>
+                <th scope="col">Categoria</th>
               </tr>
             </thead>
             <tbody id="lista-tabela">
@@ -96,7 +126,6 @@
     </main>
   </div>
 
-  <!-- Modal de adicionar item -->
   <div
     class="modal fade"
     id="modalAdicionarItemLista"
@@ -118,7 +147,6 @@
           </div>
 
           <div class="modal-body">
-            <!-- Nome do item -->
             <div class="mb-3">
               <label for="lista-item-nome" class="form-label">Nome do item</label>
               <input
@@ -131,7 +159,6 @@
               >
             </div>
 
-            <!-- Unidade -->
             <div class="mb-3">
               <label for="lista-item-unidade" class="form-label">Unidade</label>
               <select class="form-select" id="lista-item-unidade" name="lista-item-unidade" required>
@@ -150,7 +177,6 @@
               </select>
             </div>
 
-            <!-- Campo manual para unidade personalizada -->
             <div class="mb-3 d-none" id="campo-lista-unidade-outra-wrapper">
               <label for="campo-lista-unidade-outra" class="form-label">Digite a unidade</label>
               <input
@@ -162,7 +188,7 @@
               >
             </div>
 
-            <div id="lista-mensagem" class="small text-danger"></div>
+            <div id="lista-mensagem" class="small text-danger" aria-live="polite"></div>
           </div>
 
           <div class="modal-footer">
@@ -178,18 +204,75 @@
     </div>
   </div>
 
-  <!-- Mapa do site inferior -->
   <footer class="site-map-bottom mt-4">
     <div class="container py-3">
       <div class="d-flex flex-wrap gap-2 justify-content-center">
         <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
         <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-        <a href="lista.html" class="btn btn-primary btn-sm">Lista</a>
+        <a href="lista.html" class="btn btn-primary btn-sm" aria-current="page">Lista</a>
         <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
         <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
       </div>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      const menu = document.getElementById("menu-lateral-lista");
+      const menuContent = menu ? menu.querySelector(".site-map-left-content") : null;
+      const btnAbrir = document.getElementById("btn-menu-mobile");
+      const btnFechar = document.getElementById("btn-fechar-menu-mobile");
+      const backdrop = document.getElementById("menu-mobile-backdrop");
+
+      function abrirMenu() {
+        if (!menu || !menuContent || !btnAbrir || !backdrop) {
+          return;
+        }
+
+        menu.classList.add("is-open");
+        menuContent.classList.add("is-open");
+        backdrop.hidden = false;
+        btnAbrir.setAttribute("aria-expanded", "true");
+        document.body.classList.add("menu-mobile-open");
+      }
+
+      function fecharMenu() {
+        if (!menu || !menuContent || !btnAbrir || !backdrop) {
+          return;
+        }
+
+        menu.classList.remove("is-open");
+        menuContent.classList.remove("is-open");
+        backdrop.hidden = true;
+        btnAbrir.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("menu-mobile-open");
+      }
+
+      if (btnAbrir) {
+        btnAbrir.addEventListener("click", abrirMenu);
+      }
+
+      if (btnFechar) {
+        btnFechar.addEventListener("click", fecharMenu);
+      }
+
+      if (backdrop) {
+        backdrop.addEventListener("click", fecharMenu);
+      }
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          fecharMenu();
+        }
+      });
+
+      window.addEventListener("resize", function () {
+        if (window.innerWidth >= 992) {
+          fecharMenu();
+        }
+      });
+    })();
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="lista.js"></script>
