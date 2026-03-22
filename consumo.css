@@ -2,6 +2,12 @@
 body {
   min-height: 100vh;
   background-color: #f8f9fa;
+  overflow-x: hidden;
+}
+
+/* Classe usada quando o menu mobile estiver aberto */
+body.menu-mobile-open {
+  overflow: hidden;
 }
 
 /* Cria o visual padrão das caixas de conteúdo */
@@ -26,7 +32,7 @@ body {
 }
 
 /* Estrutura fixa do menu lateral esquerdo.
-   Largura restrita à faixa sensível. */
+   No desktop, a largura fica restrita à faixa sensível. */
 .site-map-left {
   position: fixed;
   top: 0;
@@ -48,7 +54,9 @@ body {
   top: 0;
   left: 0;
   width: 220px;
+  max-width: 85vw;
   height: 100vh;
+  overflow-y: auto;
   background-color: #ffffff;
   border-right: 1px solid #dee2e6;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
@@ -61,6 +69,22 @@ body {
   .site-map-left:hover .site-map-left-content {
     transform: translateX(0);
   }
+}
+
+/* Estado de abertura controlado por classe.
+   Permite integração futura com botão hambúrguer via JavaScript. */
+.site-map-left.is-open .site-map-left-content,
+.site-map-left.menu-open .site-map-left-content,
+.site-map-left-content.is-open {
+  transform: translateX(0);
+}
+
+/* Fundo escurecido para menu mobile */
+.menu-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 1039;
 }
 
 /* Deixa apenas a aba ativa visível */
@@ -86,9 +110,50 @@ body {
 /* Melhora a visualização da tabela em telas pequenas */
 .table-responsive {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Dá melhor alinhamento visual aos campos de seleção */
 .form-label {
   font-weight: 500;
+}
+
+/* Ajustes para mobile */
+@media (max-width: 991.98px) {
+  .site-map-left {
+    width: 0;
+    overflow: visible;
+  }
+
+  .site-map-left-hover-area {
+    display: none;
+  }
+
+  .site-map-left-content {
+    position: fixed;
+    width: 260px;
+    max-width: 85vw;
+    z-index: 1041;
+  }
+
+  .app-box {
+    padding: 18px;
+  }
+}
+
+/* Ajustes extras para telas muito pequenas */
+@media (max-width: 575.98px) {
+  .app-box {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .site-map-left-content {
+    width: 240px;
+    max-width: 88vw;
+  }
+
+  .resultado-visualizacao {
+    min-height: 100px;
+  }
 }
