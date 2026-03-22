@@ -244,7 +244,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (itensCompra.length === 0) {
       compraTabela.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center text-muted">
+          <td colspan="6" class="text-center text-muted">
             Nenhuma compra registrada até o momento.
           </td>
         </tr>
@@ -255,12 +255,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let totalAcumulado = 0;
 
-    itensCompra.forEach(function (item) {
+    itensCompra.forEach(function (item, indice) {
       const subtotal = item.quantidade * item.valorUnitario;
       totalAcumulado += subtotal;
 
       const novaLinha = document.createElement("tr");
       novaLinha.innerHTML = `
+        <td>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-warning btn-editar" data-indice="${indice}">
+              Editar
+            </button>
+            <button type="button" class="btn btn-sm btn-danger btn-remover" data-indice="${indice}">
+              Remover
+            </button>
+          </div>
+        </td>
         <td>${item.item}</td>
         <td>${formatarNumero(item.quantidade)}</td>
         <td>${item.unidade}</td>
@@ -269,11 +279,53 @@ document.addEventListener("DOMContentLoaded", function () {
       `;
 
       compraTabela.appendChild(novaLinha);
+      
+      const botaoEditar = novaLinha.querySelector(".btn-editar");
+      const botaoRemover = novaLinha.querySelector(".btn-remover");
+      
+      botaoEditar.addEventListener("click", function () {
+        const itemExistente = itensCompra[indice];
+        
+        document.getElementById("compra-item").value = itemExistente.item;
+        document.getElementById("compra-quantidade").value = itemExistente.quantidade;
+        document.getElementById("compra-valor-unitario").value = itemExistente.valorUnitario;
+        
+        const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
+          return option.value === itemExistente.unidade;
+        });
+        
+        if (unidadeExisteNaLista) {
+          campoUnidade.value = itemExistente.unidade;
+          campoUnidadeOutraWrapper.classList.add("d-none");
+          campoUnidadeOutra.required = false;
+          campoUnidadeOutra.value = "";
+        } else {
+          campoUnidade.value = "outro(s)";
+          campoUnidadeOutraWrapper.classList.remove("d-none");
+          campoUnidadeOutra.required = true;
+          campoUnidadeOutra.value = "";
+        }
+        
+        indiceEdicao = indice;
+        modalBootstrap.show();
+      });
+      
+      botaoRemover.addEventListener("click", function () {
+        const desejaRemover = confirm("Deseja remover este item da compra?");
+        
+        if (!desejaRemover) {
+          return;
+        }
+        
+        itensCompra.splice(indice, 1);
+        salvarCompra();
+        renderizarTabela();
+      });
     });
-
+    
     totalCompra.textContent = formatarMoeda(totalAcumulado);
   }
-
+  
   function limparFormularioFecharModal() {
     compraForm.reset();
     campoUnidadeOutraWrapper.classList.add("d-none");
