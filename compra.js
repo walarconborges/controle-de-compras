@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const compraTabela = document.getElementById("compra-tabela");
   const totalCompra = document.getElementById("total-compra");
   const campoItem = document.getElementById("compra-item");
+  const sugestoesCompra = document.getElementById("sugestoes-compra");
 
   const campoUnidade = document.getElementById("compra-unidade");
   const campoUnidadeOutraWrapper = document.getElementById("campo-compra-unidade-outra-wrapper");
@@ -29,6 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let indiceEdicao = null;
   let itemPendente = null;
   let indiceItemRepetido = null;
+  let categoriaSelecionadaDoEstoque = "";
 
   renderizarTabela();
 
@@ -45,14 +47,20 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   campoItem.addEventListener("input", function () {
-    preencherSugestaoDoEstoque();
+    renderizarSugestoesDoEstoque();
+  });
+
+  campoItem.addEventListener("blur", function () {
+    setTimeout(function () {
+      limparSugestoes();
+    }, 150);
   });
 
   compraForm.addEventListener("submit", function (event) {
     event.preventDefault();
     campoMensagem.textContent = "";
 
-    const nome = document.getElementById("compra-item").value.trim();
+    const nome = campoItem.value.trim();
     const quantidade = normalizarNumero(document.getElementById("compra-quantidade").value);
     const valorUnitario = normalizarNumero(document.getElementById("compra-valor-unitario").value);
     let unidade = campoUnidade.value;
@@ -75,7 +83,8 @@ document.addEventListener("DOMContentLoaded", function () {
       nome: nome,
       quantidade: quantidade,
       unidade: unidade,
-      valorUnitario: valorUnitario
+      valorUnitario: valorUnitario,
+      categoria: categoriaSelecionadaDoEstoque || ""
     };
 
     if (indiceEdicao !== null) {
@@ -182,7 +191,7 @@ document.addEventListener("DOMContentLoaded", function () {
           nome: itemCompra.nome,
           unidade: itemCompra.unidade,
           quantidade: Number(itemCompra.quantidade),
-          categoria: ""
+          categoria: itemCompra.categoria || ""
         };
 
         estoqueAtual.push(novoItemEstoque);
@@ -219,7 +228,8 @@ document.addEventListener("DOMContentLoaded", function () {
           quantidade: Number(item.quantidade),
           unidade: item.unidade,
           valorUnitario: Number(item.valorUnitario),
-          subtotal: Number(item.quantidade) * Number(item.valorUnitario)
+          subtotal: Number(item.quantidade) * Number(item.valorUnitario),
+          categoria: item.categoria || ""
         };
       })
     };
@@ -394,9 +404,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function preencherFormulario(item) {
-    document.getElementById("compra-item").value = item.nome;
+    campoItem.value = item.nome;
     document.getElementById("compra-quantidade").value = item.quantidade;
     document.getElementById("compra-valor-unitario").value = item.valorUnitario;
+    categoriaSelecionadaDoEstoque = item.categoria || "";
 
     preencherSelectOuOutro(
       campoUnidade,
@@ -404,6 +415,55 @@ document.addEventListener("DOMContentLoaded", function () {
       campoUnidadeOutra,
       item.unidade
     );
+  }
+
+  function renderizarSugestoesDoEstoque() {
+    const termoDigitado = campoItem.value.trim().toLowerCase();
+
+    limparSugestoes();
+
+    if (!termoDigitado) {
+      categoriaSelecionadaDoEstoque = "";
+      return;
+    }
+
+    const estoqueAtual = carregarEstoque();
+
+    const sugestoes = estoqueAtual.filter(function (item) {
+      return item.nome && item.nome.trim().toLowerCase().includes(termoDigitado);
+    }).slice(0, 5);
+
+    if (sugestoes.length === 0) {
+      categoriaSelecionadaDoEstoque = "";
+      return;
+    }
+
+    sugestoes.forEach(function (item) {
+      const botaoSugestao = document.createElement("button");
+      botaoSugestao.type = "button";
+      botaoSugestao.className = "list-group-item list-group-item-action";
+      botaoSugestao.textContent = `${item.nome} (${item.unidade})`;
+
+      botaoSugestao.addEventListener("click", function () {
+        campoItem.value = item.nome;
+        categoriaSelecionadaDoEstoque = item.categoria || "";
+
+        preencherSelectOuOutro(
+          campoUnidade,
+          campoUnidadeOutraWrapper,
+          campoUnidadeOutra,
+          item.unidade || ""
+        );
+
+        limparSugestoes();
+      });
+
+      sugestoesCompra.appendChild(botaoSugestao);
+    });
+  }
+
+  function limparSugestoes() {
+    sugestoesCompra.innerHTML = "";
   }
 
   function preencherSelectOuOutro(selectElement, wrapperElement, inputElement, valor) {
@@ -449,43 +509,13 @@ document.addEventListener("DOMContentLoaded", function () {
     campoUnidadeOutraWrapper.classList.add("d-none");
     campoUnidadeOutra.required = false;
     campoUnidadeOutra.value = "";
+    categoriaSelecionadaDoEstoque = "";
+    limparSugestoes();
   }
 
   function limparFormularioFecharModal() {
     limparFormulario();
     modalBootstrap.hide();
-  }
-
-    function limparFormularioFecharModal() {
-    limparFormulario();
-    modalBootstrap.hide();
-  }
-
-  function preencherSugestaoDoEstoque() {
-    const termoDigitado = campoItem.value.trim().toLowerCase();
-
-    if (!termoDigitado) {
-      return;
-    }
-
-    const estoqueAtual = carregarEstoque();
-
-    const itemEncontrado = estoqueAtual.find(function (item) {
-      return item.nome && item.nome.trim().toLowerCase().includes(termoDigitado);
-    });
-
-    if (!itemEncontrado) {
-      return;
-    }
-
-    campoItem.value = itemEncontrado.nome;
-
-    preencherSelectOuOutro(
-      campoUnidade,
-      campoUnidadeOutraWrapper,
-      campoUnidadeOutra,
-      itemEncontrado.unidade || ""
-    );
   }
 
   function normalizarNumero(valor) {
