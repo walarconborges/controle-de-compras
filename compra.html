@@ -68,20 +68,20 @@
         </p>
       </section>
 
-     <section class="app-box mb-4">
-       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-         <div>
-           <h2 class="h4 mb-3">Total da compra</h2>
-           <p class="fs-4 mb-0">
-             R$ <span id="total-compra">0,00</span>
-           </p>
-         </div>
-         
-         <button type="button" class="btn btn-success" id="btn-finalizar-compra">
-           Finalizar compra
-         </button>
-       </div>
-     </section>
+      <section class="app-box mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h2 class="h4 mb-3">Total da compra</h2>
+            <p class="fs-4 mb-0">
+              R$ <span id="total-compra">0,00</span>
+            </p>
+          </div>
+
+          <button type="button" class="btn btn-success" id="btn-finalizar-compra">
+            Finalizar compra
+          </button>
+        </div>
+      </section>
 
       <section class="app-box">
         <h2 class="h4 mb-3">Itens comprados</h2>
@@ -133,7 +133,7 @@
           </div>
 
           <div class="modal-body">
-            <div class="mb-3">
+            <div class="mb-3 position-relative">
               <label for="compra-item" class="form-label">Nome do item</label>
               <input
                 type="text"
@@ -141,8 +141,10 @@
                 id="compra-item"
                 name="compra-item"
                 placeholder="Ex.: Arroz"
+                autocomplete="off"
                 required
               >
+              <div id="sugestoes-compra" class="list-group mt-1"></div>
             </div>
 
             <div class="mb-3">
@@ -250,13 +252,13 @@
             class="btn-close"
             data-bs-dismiss="modal"
             aria-label="Fechar"
-            ></button>
+          ></button>
         </div>
-        
+
         <div class="modal-body">
           Este item já foi adicionado nesta compra. O que deseja fazer?
         </div>
-        
+
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="btn-cancelar-item-repetido-compra">
             Cancelar
@@ -271,7 +273,7 @@
       </div>
     </div>
   </div>
-  
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="compra.js"></script>
 </body>
