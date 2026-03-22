@@ -7,9 +7,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const campoUnidade = document.getElementById("item-unidade");
   const campoUnidadeOutraWrapper = document.getElementById("campo-unidade-outra-wrapper");
   const campoUnidadeOutra = document.getElementById("campo-unidade-outra");
-  const campoLocalizacao = document.getElementById("item-localizacao");
-  const campoLocalizacaoOutraWrapper = document.getElementById("campo-localizacao-outra-wrapper");
-  const campoLocalizacaoOutra = document.getElementById("campo-localizacao-outra");
+  const campoCategoria = document.getElementById("item-categoria");
+  const campoCategoriaOutraWrapper = document.getElementById("campo-categoria-outra-wrapper");
+  const campoCategoriaOutra = document.getElementById("campo-categoria-outra");
   const campoMensagem = document.getElementById("estoque-mensagem");
   const modalElement = document.getElementById("modalAdicionarItem");
 
@@ -40,8 +40,8 @@ document.addEventListener("DOMContentLoaded", function () {
     alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
   });
 
-  campoLocalizacao.addEventListener("change", function () {
-    alternarCampoOutro(campoLocalizacao, campoLocalizacaoOutraWrapper, campoLocalizacaoOutra);
+  campoCategoria.addEventListener("change", function () {
+    alternarCampoOutro(campoCategoria, campoCategoriaOutraWrapper, campoCategoriaOutra);
   });
 
   estoqueForm.addEventListener("submit", function (event) {
@@ -50,15 +50,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const nome = document.getElementById("item-nome").value.trim();
     let unidade = campoUnidade.value;
-    let localizacao = campoLocalizacao.value;
+    let categoria = campoCategoria.value;
     const quantidade = normalizarQuantidade(document.getElementById("item-quantidade").value);
 
     if (unidade === "outro(s)") {
       unidade = campoUnidadeOutra.value.trim();
     }
 
-    if (localizacao === "outro(s)") {
-      localizacao = campoLocalizacaoOutra.value.trim();
+    if (categoria === "outro(s)") {
+      categoria = campoCategoriaOutra.value.trim();
     }
 
     if (!nome || !unidade || isNaN(quantidade)) {
@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", function () {
       nome: nome,
       unidade: unidade,
       quantidade: quantidade,
-      localizacao: localizacao
+      categoria: categoria
     };
 
     if (indiceEdicao !== null) {
@@ -207,7 +207,7 @@ document.addEventListener("DOMContentLoaded", function () {
         novaLinha.classList.add("status-danger");
       }
 
-      if (!item.localizacao || item.localizacao.trim() === "") {
+      if (!item.categoria || item.categoria.trim() === "") {
         novaLinha.classList.add("status-location-empty");
       }
 
@@ -243,7 +243,7 @@ document.addEventListener("DOMContentLoaded", function () {
             </button>
           </div>
         </td>
-        <td>${item.localizacao || ""}</td>
+        <td>${item.categoria|| ""}</td>
       `;
 
       estoqueTabela.appendChild(novaLinha);
@@ -365,7 +365,7 @@ document.addEventListener("DOMContentLoaded", function () {
       tipo: tipo,
       nome: item.nome,
       unidade: item.unidade,
-      localizacao: item.localizacao || "",
+      categoria: item.categoria || "",
       quantidadeAnterior: anterior,
       quantidadeNova: nova,
       variacao: variacao,
@@ -402,10 +402,10 @@ document.addEventListener("DOMContentLoaded", function () {
     );
 
     preencherSelectOuOutro(
-      campoLocalizacao,
-      campoLocalizacaoOutraWrapper,
-      campoLocalizacaoOutra,
-      item.localizacao || ""
+      campoCategoria,
+      campoCategoriaOutraWrapper,
+      campoCategoriaOutra,
+      item.categoria || ""
     );
   }
 
@@ -443,9 +443,9 @@ document.addEventListener("DOMContentLoaded", function () {
     campoUnidadeOutra.required = false;
     campoUnidadeOutra.value = "";
 
-    campoLocalizacaoOutraWrapper.classList.add("d-none");
-    campoLocalizacaoOutra.required = false;
-    campoLocalizacaoOutra.value = "";
+    campoCategoriaOutraWrapper.classList.add("d-none");
+    campoCategoriaOutra.required = false;
+    campoCategoriaOutra.value = "";
   }
 
   function removerLinhaVazia() {
@@ -459,7 +459,7 @@ document.addEventListener("DOMContentLoaded", function () {
     return (
       itemAnterior.nome !== itemNovo.nome ||
       itemAnterior.unidade !== itemNovo.unidade ||
-      (itemAnterior.localizacao || "") !== (itemNovo.localizacao || "")
+      (itemAnterior.categoria || "") !== (itemNovo.categoria || "")
     );
   }
 });
