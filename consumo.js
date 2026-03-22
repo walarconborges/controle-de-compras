@@ -2,8 +2,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_HISTORICO_COMPRAS = "controleComprasHistoricoCompras";
   const CHAVE_MOVIMENTACOES_ESTOQUE = "controleComprasMovimentacoesEstoque";
 
-  const tabButtons = document.querySelectorAll("#consumo-tabs .nav-link");
-  const tabSections = document.querySelectorAll(".tab-content-section");
   const visualizacaoConsumo = document.getElementById("visualizacao-consumo");
   const visualizacaoCompras = document.getElementById("visualizacao-compras");
   const agrupamentoConsumo = document.getElementById("agrupamento-consumo");
@@ -24,27 +22,6 @@ document.addEventListener("DOMContentLoaded", function () {
     console.error("Estrutura HTML das visualizações de consumo/compras não encontrada.");
     return;
   }
-
-  tabButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
-      const targetTab = button.getAttribute("data-tab");
-
-      tabButtons.forEach(function (tab) {
-        tab.classList.remove("active");
-      });
-
-      button.classList.add("active");
-
-      tabSections.forEach(function (section) {
-        section.classList.remove("active");
-      });
-
-      const secaoAlvo = document.getElementById(targetTab);
-      if (secaoAlvo) {
-        secaoAlvo.classList.add("active");
-      }
-    });
-  });
 
   visualizacaoConsumo.addEventListener("change", function () {
     renderizarConsumo();
@@ -69,9 +46,26 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     try {
-      return JSON.parse(dadosSalvos);
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
     } catch (erro) {
       console.error("Erro ao carregar histórico de compras:", erro);
+      return [];
+    }
+  }
+
+  function carregarMovimentacoesEstoque() {
+    const dadosSalvos = localStorage.getItem(CHAVE_MOVIMENTACOES_ESTOQUE);
+
+    if (!dadosSalvos) {
+      return [];
+    }
+
+    try {
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+      console.error("Erro ao carregar movimentações do estoque:", erro);
       return [];
     }
   }
@@ -81,21 +75,18 @@ document.addEventListener("DOMContentLoaded", function () {
     const modo = visualizacaoCompras.value;
 
     if (historico.length === 0) {
-      if (graficoCompras) {
-        graficoCompras.destroy();
-        graficoCompras = null;
-      }
+      destruirGraficoCompras();
 
       resultadoComprasContainer.innerHTML = `
         <div class="table-responsive">
           <table class="table table-bordered table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th>Data da compra</th>
-                <th>Total da compra</th>
-                <th>Quantidade de itens</th>
-                <th>Média por compra</th>
-                <th>Média por item</th>
+                <th scope="col">Data da compra</th>
+                <th scope="col">Total da compra</th>
+                <th scope="col">Quantidade de itens</th>
+                <th scope="col">Média por compra</th>
+                <th scope="col">Média por item</th>
               </tr>
             </thead>
             <tbody>
@@ -139,21 +130,6 @@ document.addEventListener("DOMContentLoaded", function () {
     renderizarComprasTabela(historico);
   }
 
-  function carregarMovimentacoesEstoque() {
-    const dadosSalvos = localStorage.getItem(CHAVE_MOVIMENTACOES_ESTOQUE);
-
-    if (!dadosSalvos) {
-      return [];
-    }
-
-    try {
-      return JSON.parse(dadosSalvos);
-    } catch (erro) {
-      console.error("Erro ao carregar movimentações do estoque:", erro);
-      return [];
-    }
-  }
-
   function renderizarConsumo() {
     const movimentacoes = carregarMovimentacoesEstoque();
     const consumos = movimentacoes.filter(function (mov) {
@@ -164,24 +140,21 @@ document.addEventListener("DOMContentLoaded", function () {
     const agrupamento = agrupamentoConsumo.value;
 
     if (consumos.length === 0) {
-      if (graficoConsumo) {
-        graficoConsumo.destroy();
-        graficoConsumo = null;
-      }
+      destruirGraficoConsumo();
 
       resultadoConsumoContainer.innerHTML = `
         <div class="table-responsive">
           <table class="table table-bordered table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th>${agrupamento === "categoria" ? "Categoria" : "Item"}</th>
-                ${agrupamento === "categoria" ? "" : "<th>Unidade</th>"}
-                <th>Data inicial</th>
-                <th>Data final</th>
-                <th>Dias no período</th>
-                <th>Consumo total</th>
-                <th>Média diária</th>
-                <th>Ocorrências</th>
+                <th scope="col">${agrupamento === "categoria" ? "Categoria" : "Item"}</th>
+                ${agrupamento === "categoria" ? "" : '<th scope="col">Unidade</th>'}
+                <th scope="col">Data inicial</th>
+                <th scope="col">Data final</th>
+                <th scope="col">Dias no período</th>
+                <th scope="col">Consumo total</th>
+                <th scope="col">Média diária</th>
+                <th scope="col">Ocorrências</th>
               </tr>
             </thead>
             <tbody>
@@ -235,7 +208,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const dataMov = new Date(mov.data);
       const consumo = Math.abs(Number(mov.variacao));
 
-      if (isNaN(dataMov.getTime())) {
+      if (isNaN(dataMov.getTime()) || Number.isNaN(consumo)) {
         return;
       }
 
@@ -244,17 +217,18 @@ document.addEventListener("DOMContentLoaded", function () {
       let unidadeExibicao = "";
 
       if (agrupamento === "categoria") {
-        nomeExibicao = mov.categoria && mov.categoria.trim() ? mov.categoria.trim() : "Sem categoria";
-        chave = nomeExibicao.toLowerCase();
-        unidadeExibicao = "";
+        nomeExibicao = mov.categoria && String(mov.categoria).trim()
+          ? String(mov.categoria).trim()
+          : "Sem categoria";
+        chave = normalizarTexto(nomeExibicao);
       } else {
         if (!mov.nome || !mov.unidade) {
           return;
         }
 
-        nomeExibicao = mov.nome;
-        unidadeExibicao = mov.unidade;
-        chave = `${mov.nome}||${mov.unidade}`;
+        nomeExibicao = String(mov.nome).trim();
+        unidadeExibicao = String(mov.unidade).trim();
+        chave = `${normalizarTexto(nomeExibicao)}||${normalizarTexto(unidadeExibicao)}`;
       }
 
       if (!grupos[chave]) {
@@ -304,24 +278,21 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarComprasTabela(historico) {
-    if (graficoCompras) {
-      graficoCompras.destroy();
-      graficoCompras = null;
-    }
+    destruirGraficoCompras();
 
     let linhas = "";
 
     historico.forEach(function (compra) {
-      const mediaPorCompra = Number(compra.total) || 0;
-      const mediaPorItem = Number(compra.quantidadeItens) > 0
-        ? Number(compra.total) / Number(compra.quantidadeItens)
-        : 0;
+      const total = Number(compra.total) || 0;
+      const quantidadeItens = Number(compra.quantidadeItens) || 0;
+      const mediaPorCompra = total;
+      const mediaPorItem = quantidadeItens > 0 ? total / quantidadeItens : 0;
 
       linhas += `
         <tr>
-          <td>${formatarData(compra.data)}</td>
-          <td>R$ ${formatarMoeda(compra.total)}</td>
-          <td>${compra.quantidadeItens}</td>
+          <td>${escaparHtml(formatarData(compra.data))}</td>
+          <td>R$ ${formatarMoeda(total)}</td>
+          <td>${formatarNumeroInteiro(quantidadeItens)}</td>
           <td>R$ ${formatarMoeda(mediaPorCompra)}</td>
           <td>R$ ${formatarMoeda(mediaPorItem)}</td>
         </tr>
@@ -333,11 +304,11 @@ document.addEventListener("DOMContentLoaded", function () {
         <table class="table table-bordered table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
-              <th>Data da compra</th>
-              <th>Total da compra</th>
-              <th>Quantidade de itens</th>
-              <th>Média por compra</th>
-              <th>Média por item</th>
+              <th scope="col">Data da compra</th>
+              <th scope="col">Total da compra</th>
+              <th scope="col">Quantidade de itens</th>
+              <th scope="col">Média por compra</th>
+              <th scope="col">Média por item</th>
             </tr>
           </thead>
           <tbody>${linhas}</tbody>
@@ -347,21 +318,19 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarComprasLista(historico) {
-    if (graficoCompras) {
-      graficoCompras.destroy();
-      graficoCompras = null;
-    }
+    destruirGraficoCompras();
 
     const blocos = historico.map(function (compra) {
-      const mediaPorItem = Number(compra.quantidadeItens) > 0
-        ? Number(compra.total) / Number(compra.quantidadeItens)
-        : 0;
+      const total = Number(compra.total) || 0;
+      const quantidadeItens = Number(compra.quantidadeItens) || 0;
+      const mediaPorItem = quantidadeItens > 0 ? total / quantidadeItens : 0;
 
       return `
         <div class="border rounded p-3 mb-3">
-          <div><strong>Data:</strong> ${formatarData(compra.data)}</div>
-          <div><strong>Total:</strong> R$ ${formatarMoeda(compra.total)}</div>
-          <div><strong>Itens:</strong> ${compra.quantidadeItens}</div>
+          <div><strong>Data:</strong> ${escaparHtml(formatarData(compra.data))}</div>
+          <div><strong>Total:</strong> R$ ${formatarMoeda(total)}</div>
+          <div><strong>Itens:</strong> ${formatarNumeroInteiro(quantidadeItens)}</div>
+          <div><strong>Média por compra:</strong> R$ ${formatarMoeda(total)}</div>
           <div><strong>Média por item:</strong> R$ ${formatarMoeda(mediaPorItem)}</div>
         </div>
       `;
@@ -371,11 +340,15 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarComprasBarras(historico) {
-    const labels = historico.map(function (compra) {
+    const historicoOrdenado = historico.slice().sort(function (a, b) {
+      return new Date(a.data) - new Date(b.data);
+    });
+
+    const labels = historicoOrdenado.map(function (compra) {
       return formatarData(compra.data);
     });
 
-    const valores = historico.map(function (compra) {
+    const valores = historicoOrdenado.map(function (compra) {
       return Number(compra.total) || 0;
     });
 
@@ -391,10 +364,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (graficoCompras) {
-      graficoCompras.destroy();
-      graficoCompras = null;
-    }
+    destruirGraficoCompras();
 
     graficoCompras = new Chart(canvas, {
       type: "bar",
@@ -422,11 +392,15 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarComprasPizza(historico) {
-    const labels = historico.map(function (compra) {
+    const historicoOrdenado = historico.slice().sort(function (a, b) {
+      return new Date(a.data) - new Date(b.data);
+    });
+
+    const labels = historicoOrdenado.map(function (compra) {
       return formatarData(compra.data);
     });
 
-    const valores = historico.map(function (compra) {
+    const valores = historicoOrdenado.map(function (compra) {
       return Number(compra.total) || 0;
     });
 
@@ -442,10 +416,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (graficoCompras) {
-      graficoCompras.destroy();
-      graficoCompras = null;
-    }
+    destruirGraficoCompras();
 
     graficoCompras = new Chart(canvas, {
       type: "pie",
@@ -492,10 +463,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (graficoCompras) {
-      graficoCompras.destroy();
-      graficoCompras = null;
-    }
+    destruirGraficoCompras();
 
     graficoCompras = new Chart(canvas, {
       type: "line",
@@ -525,36 +493,33 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarConsumoTabela(dados, agrupamento) {
-    if (graficoConsumo) {
-      graficoConsumo.destroy();
-      graficoConsumo = null;
-    }
+    destruirGraficoConsumo();
 
     const linhas = dados.map(function (grupo) {
       if (agrupamento === "categoria") {
         return `
           <tr>
-            <td>${grupo.nome}</td>
-            <td>${formatarData(grupo.dataInicial)}</td>
-            <td>${formatarData(grupo.dataFinal)}</td>
-            <td>${grupo.diasNoPeriodo}</td>
+            <td>${escaparHtml(grupo.nome)}</td>
+            <td>${escaparHtml(formatarData(grupo.dataInicial))}</td>
+            <td>${escaparHtml(formatarData(grupo.dataFinal))}</td>
+            <td>${formatarNumeroInteiro(grupo.diasNoPeriodo)}</td>
             <td>${formatarNumero(grupo.consumoTotal)}</td>
             <td>${formatarNumero(grupo.mediaDiaria)}</td>
-            <td>${grupo.ocorrencias}</td>
+            <td>${formatarNumeroInteiro(grupo.ocorrencias)}</td>
           </tr>
         `;
       }
 
       return `
         <tr>
-          <td>${grupo.nome}</td>
-          <td>${grupo.unidade}</td>
-          <td>${formatarData(grupo.dataInicial)}</td>
-          <td>${formatarData(grupo.dataFinal)}</td>
-          <td>${grupo.diasNoPeriodo}</td>
+          <td>${escaparHtml(grupo.nome)}</td>
+          <td>${escaparHtml(grupo.unidade)}</td>
+          <td>${escaparHtml(formatarData(grupo.dataInicial))}</td>
+          <td>${escaparHtml(formatarData(grupo.dataFinal))}</td>
+          <td>${formatarNumeroInteiro(grupo.diasNoPeriodo)}</td>
           <td>${formatarNumero(grupo.consumoTotal)}</td>
           <td>${formatarNumero(grupo.mediaDiaria)}</td>
-          <td>${grupo.ocorrencias}</td>
+          <td>${formatarNumeroInteiro(grupo.ocorrencias)}</td>
         </tr>
       `;
     }).join("");
@@ -565,13 +530,13 @@ document.addEventListener("DOMContentLoaded", function () {
           <table class="table table-bordered table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th>Categoria</th>
-                <th>Data inicial</th>
-                <th>Data final</th>
-                <th>Dias no período</th>
-                <th>Consumo total</th>
-                <th>Média diária</th>
-                <th>Ocorrências</th>
+                <th scope="col">Categoria</th>
+                <th scope="col">Data inicial</th>
+                <th scope="col">Data final</th>
+                <th scope="col">Dias no período</th>
+                <th scope="col">Consumo total</th>
+                <th scope="col">Média diária</th>
+                <th scope="col">Ocorrências</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>
@@ -586,14 +551,14 @@ document.addEventListener("DOMContentLoaded", function () {
         <table class="table table-bordered table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
-              <th>Item</th>
-              <th>Unidade</th>
-              <th>Data inicial</th>
-              <th>Data final</th>
-              <th>Dias no período</th>
-              <th>Consumo total</th>
-              <th>Média diária</th>
-              <th>Ocorrências</th>
+              <th scope="col">Item</th>
+              <th scope="col">Unidade</th>
+              <th scope="col">Data inicial</th>
+              <th scope="col">Data final</th>
+              <th scope="col">Dias no período</th>
+              <th scope="col">Consumo total</th>
+              <th scope="col">Média diária</th>
+              <th scope="col">Ocorrências</th>
             </tr>
           </thead>
           <tbody>${linhas}</tbody>
@@ -603,32 +568,31 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarConsumoLista(dados, agrupamento) {
-    if (graficoConsumo) {
-      graficoConsumo.destroy();
-      graficoConsumo = null;
-    }
+    destruirGraficoConsumo();
 
     const blocos = dados.map(function (grupo) {
       if (agrupamento === "categoria") {
         return `
           <div class="border rounded p-3 mb-3">
-            <div><strong>Categoria:</strong> ${grupo.nome}</div>
-            <div><strong>Período:</strong> ${formatarData(grupo.dataInicial)} até ${formatarData(grupo.dataFinal)}</div>
+            <div><strong>Categoria:</strong> ${escaparHtml(grupo.nome)}</div>
+            <div><strong>Período:</strong> ${escaparHtml(formatarData(grupo.dataInicial))} até ${escaparHtml(formatarData(grupo.dataFinal))}</div>
+            <div><strong>Dias no período:</strong> ${formatarNumeroInteiro(grupo.diasNoPeriodo)}</div>
             <div><strong>Consumo total:</strong> ${formatarNumero(grupo.consumoTotal)}</div>
             <div><strong>Média diária:</strong> ${formatarNumero(grupo.mediaDiaria)}</div>
-            <div><strong>Ocorrências:</strong> ${grupo.ocorrencias}</div>
+            <div><strong>Ocorrências:</strong> ${formatarNumeroInteiro(grupo.ocorrencias)}</div>
           </div>
         `;
       }
 
       return `
         <div class="border rounded p-3 mb-3">
-          <div><strong>Item:</strong> ${grupo.nome}</div>
-          <div><strong>Unidade:</strong> ${grupo.unidade}</div>
-          <div><strong>Período:</strong> ${formatarData(grupo.dataInicial)} até ${formatarData(grupo.dataFinal)}</div>
+          <div><strong>Item:</strong> ${escaparHtml(grupo.nome)}</div>
+          <div><strong>Unidade:</strong> ${escaparHtml(grupo.unidade)}</div>
+          <div><strong>Período:</strong> ${escaparHtml(formatarData(grupo.dataInicial))} até ${escaparHtml(formatarData(grupo.dataFinal))}</div>
+          <div><strong>Dias no período:</strong> ${formatarNumeroInteiro(grupo.diasNoPeriodo)}</div>
           <div><strong>Consumo total:</strong> ${formatarNumero(grupo.consumoTotal)}</div>
           <div><strong>Média diária:</strong> ${formatarNumero(grupo.mediaDiaria)}</div>
-          <div><strong>Ocorrências:</strong> ${grupo.ocorrencias}</div>
+          <div><strong>Ocorrências:</strong> ${formatarNumeroInteiro(grupo.ocorrencias)}</div>
         </div>
       `;
     }).join("");
@@ -659,10 +623,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (graficoConsumo) {
-      graficoConsumo.destroy();
-      graficoConsumo = null;
-    }
+    destruirGraficoConsumo();
 
     graficoConsumo = new Chart(canvas, {
       type: "bar",
@@ -714,10 +675,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (graficoConsumo) {
-      graficoConsumo.destroy();
-      graficoConsumo = null;
-    }
+    destruirGraficoConsumo();
 
     graficoConsumo = new Chart(canvas, {
       type: "line",
@@ -746,6 +704,24 @@ document.addEventListener("DOMContentLoaded", function () {
     canvas.parentElement.style.height = "320px";
   }
 
+  function destruirGraficoCompras() {
+    if (graficoCompras) {
+      graficoCompras.destroy();
+      graficoCompras = null;
+    }
+  }
+
+  function destruirGraficoConsumo() {
+    if (graficoConsumo) {
+      graficoConsumo.destroy();
+      graficoConsumo = null;
+    }
+  }
+
+  function normalizarTexto(valor) {
+    return String(valor || "").trim().toLowerCase();
+  }
+
   function formatarData(valor) {
     const data = valor instanceof Date ? valor : new Date(valor);
 
@@ -763,10 +739,26 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  function formatarNumeroInteiro(valor) {
+    return Number(valor).toLocaleString("pt-BR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  }
+
   function formatarMoeda(valor) {
     return Number(valor).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  }
+
+  function escaparHtml(valor) {
+    return String(valor || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 });
