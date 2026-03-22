@@ -9,69 +9,122 @@
   <link rel="stylesheet" href="consumo.css">
 </head>
 <body>
-  <!-- Mapa do site superior -->
-  <nav class="site-map-top">
-    <div class="container py-2">
-      <div class="d-flex flex-wrap gap-2 justify-content-center">
-        <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-        <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-        <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
-        <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-        <a href="consumo.html" class="btn btn-primary btn-sm">Consumo</a>
-      </div>
-    </div>
-  </nav>
+  <header>
+    <nav class="site-map-top">
+      <div class="container py-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm d-lg-none"
+            id="btn-menu-mobile"
+            aria-label="Abrir menu de navegação"
+            aria-controls="menu-lateral-consumo"
+            aria-expanded="false"
+          >
+            ☰ Menu
+          </button>
 
-  <!-- Mapa do site lateral esquerdo -->
-  <aside class="site-map-left">
-    <div class="site-map-left-hover-area"></div>
+          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
+          <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+          <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
+          <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+          <a href="consumo.html" class="btn btn-primary btn-sm" aria-current="page">Consumo</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <aside class="site-map-left" id="menu-lateral-consumo" aria-label="Menu lateral">
+    <div class="site-map-left-hover-area" aria-hidden="true"></div>
 
     <div class="site-map-left-content">
       <div class="p-3">
-        <h2 class="h6 mb-3">Mapa do site</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3 d-lg-none">
+          <h2 class="h6 mb-0">Mapa do site</h2>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="btn-fechar-menu-mobile"
+            aria-label="Fechar menu de navegação"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <h2 class="h6 mb-3 d-none d-lg-block">Mapa do site</h2>
 
         <div class="d-grid gap-2">
           <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
           <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
           <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
           <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-          <a href="consumo.html" class="btn btn-primary btn-sm">Consumo</a>
+          <a href="consumo.html" class="btn btn-primary btn-sm" aria-current="page">Consumo</a>
         </div>
       </div>
     </div>
   </aside>
 
-  <div class="container py-4">
-    <header class="mb-4">
-      <h1 class="h3 mb-1">Consumo</h1>
-      <p class="text-muted mb-0">Acompanhe a média de consumo com base nas saídas registradas do estoque e a média de valores das compras.</p>
-    </header>
+  <div
+    class="menu-mobile-backdrop d-lg-none"
+    id="menu-mobile-backdrop"
+    hidden
+    aria-hidden="true"
+  ></div>
 
+  <div class="container py-4">
     <main>
-      <section class="app-box mb-4">
-        <h2 class="h4 mb-3">Orientação</h2>
+      <header class="mb-4">
+        <h1 class="h3 mb-1">Consumo</h1>
+        <p class="text-muted mb-0">
+          Acompanhe a média de consumo com base nas saídas registradas do estoque e a média de valores das compras.
+        </p>
+      </header>
+
+      <section class="app-box mb-4" aria-labelledby="orientacao-consumo-titulo">
+        <h2 class="h4 mb-3" id="orientacao-consumo-titulo">Orientação</h2>
         <p class="mb-0">
           Esta página foi organizada em duas abas: uma para acompanhar a média de consumo calculada a partir das movimentações de saída do estoque e outra para acompanhar a média de valores gastos nas compras.
         </p>
       </section>
 
-      <section class="app-box">
-        <!-- Abas internas -->
-        <ul class="nav nav-tabs mb-4" id="consumo-tabs">
-          <li class="nav-item">
-            <button type="button" class="nav-link active" data-tab="media-consumo">
+      <section class="app-box" aria-labelledby="analise-consumo-titulo">
+        <h2 class="visually-hidden" id="analise-consumo-titulo">Análises de consumo e compras</h2>
+
+        <ul class="nav nav-tabs mb-4" id="consumo-tabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button
+              type="button"
+              class="nav-link active"
+              data-tab="media-consumo"
+              id="tab-media-consumo"
+              role="tab"
+              aria-controls="media-consumo"
+              aria-selected="true"
+            >
               Média de Consumo
             </button>
           </li>
-          <li class="nav-item">
-            <button type="button" class="nav-link" data-tab="media-compras">
+          <li class="nav-item" role="presentation">
+            <button
+              type="button"
+              class="nav-link"
+              data-tab="media-compras"
+              id="tab-media-compras"
+              role="tab"
+              aria-controls="media-compras"
+              aria-selected="false"
+            >
               Média de Compras
             </button>
           </li>
         </ul>
 
-        <!-- Aba: Média de Consumo -->
-        <section id="media-consumo" class="tab-content-section active">
+        <section
+          id="media-consumo"
+          class="tab-content-section active"
+          role="tabpanel"
+          aria-labelledby="tab-media-consumo"
+        >
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label for="visualizacao-consumo" class="form-label">Visualização</label>
@@ -92,19 +145,19 @@
             </div>
           </div>
 
-          <div class="resultado-visualizacao" id="resultado-consumo">
+          <div class="resultado-visualizacao" id="resultado-consumo" aria-live="polite">
             <div class="table-responsive">
               <table class="table table-bordered table-hover align-middle mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th>Item</th>
-                    <th>Unidade</th>
-                    <th>Data inicial</th>
-                    <th>Data final</th>
-                    <th>Dias no período</th>
-                    <th>Consumo total</th>
-                    <th>Média diária</th>
-                    <th>Ocorrências</th>
+                    <th scope="col">Item</th>
+                    <th scope="col">Unidade</th>
+                    <th scope="col">Data inicial</th>
+                    <th scope="col">Data final</th>
+                    <th scope="col">Dias no período</th>
+                    <th scope="col">Consumo total</th>
+                    <th scope="col">Média diária</th>
+                    <th scope="col">Ocorrências</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -119,8 +172,12 @@
           </div>
         </section>
 
-        <!-- Aba: Média de Compras -->
-        <section id="media-compras" class="tab-content-section">
+        <section
+          id="media-compras"
+          class="tab-content-section"
+          role="tabpanel"
+          aria-labelledby="tab-media-compras"
+        >
           <div class="mb-3">
             <label for="visualizacao-compras" class="form-label">Visualização</label>
             <select class="form-select" id="visualizacao-compras" name="visualizacao-compras">
@@ -132,16 +189,16 @@
             </select>
           </div>
 
-          <div class="resultado-visualizacao" id="resultado-compras">
+          <div class="resultado-visualizacao" id="resultado-compras" aria-live="polite">
             <div class="table-responsive">
               <table class="table table-bordered table-hover align-middle mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th>Data da compra</th>
-                    <th>Total da compra</th>
-                    <th>Quantidade de itens</th>
-                    <th>Média por compra</th>
-                    <th>Média por item</th>
+                    <th scope="col">Data da compra</th>
+                    <th scope="col">Total da compra</th>
+                    <th scope="col">Quantidade de itens</th>
+                    <th scope="col">Média por compra</th>
+                    <th scope="col">Média por item</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -159,7 +216,6 @@
     </main>
   </div>
 
-  <!-- Mapa do site inferior -->
   <footer class="site-map-bottom mt-4">
     <div class="container py-3">
       <div class="d-flex flex-wrap gap-2 justify-content-center">
@@ -167,10 +223,86 @@
         <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
         <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
         <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-        <a href="consumo.html" class="btn btn-primary btn-sm">Consumo</a>
+        <a href="consumo.html" class="btn btn-primary btn-sm" aria-current="page">Consumo</a>
       </div>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      const menu = document.getElementById("menu-lateral-consumo");
+      const menuContent = menu ? menu.querySelector(".site-map-left-content") : null;
+      const btnAbrir = document.getElementById("btn-menu-mobile");
+      const btnFechar = document.getElementById("btn-fechar-menu-mobile");
+      const backdrop = document.getElementById("menu-mobile-backdrop");
+      const tabs = document.querySelectorAll("#consumo-tabs .nav-link");
+      const paineis = document.querySelectorAll(".tab-content-section");
+
+      function abrirMenu() {
+        if (!menu || !menuContent || !btnAbrir || !backdrop) {
+          return;
+        }
+
+        menu.classList.add("is-open");
+        menuContent.classList.add("is-open");
+        backdrop.hidden = false;
+        btnAbrir.setAttribute("aria-expanded", "true");
+        document.body.classList.add("menu-mobile-open");
+      }
+
+      function fecharMenu() {
+        if (!menu || !menuContent || !btnAbrir || !backdrop) {
+          return;
+        }
+
+        menu.classList.remove("is-open");
+        menuContent.classList.remove("is-open");
+        backdrop.hidden = true;
+        btnAbrir.setAttribute("aria-expanded", "false");
+        document.body.classList.remove("menu-mobile-open");
+      }
+
+      if (btnAbrir) {
+        btnAbrir.addEventListener("click", abrirMenu);
+      }
+
+      if (btnFechar) {
+        btnFechar.addEventListener("click", fecharMenu);
+      }
+
+      if (backdrop) {
+        backdrop.addEventListener("click", fecharMenu);
+      }
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          fecharMenu();
+        }
+      });
+
+      window.addEventListener("resize", function () {
+        if (window.innerWidth >= 992) {
+          fecharMenu();
+        }
+      });
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          const alvo = tab.getAttribute("data-tab");
+
+          tabs.forEach(function (outraTab) {
+            const ativa = outraTab === tab;
+            outraTab.classList.toggle("active", ativa);
+            outraTab.setAttribute("aria-selected", ativa ? "true" : "false");
+          });
+
+          paineis.forEach(function (painel) {
+            painel.classList.toggle("active", painel.id === alvo);
+          });
+        });
+      });
+    })();
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="consumo.js"></script>
