@@ -81,7 +81,7 @@
                 <th>Item</th>
                 <th>Unidade</th>
                 <th>Quantidade</th>
-                <th>Localização</th>
+                <th>Categoria</th>
               </tr>
             </thead>
             <tbody id="estoque-tabela">
@@ -176,42 +176,37 @@
                 placeholder="Digite a quantidade"
                 required
                 >
-            </div>             
+            </div>
 
-            <!-- Localização -->
+            
+            <!-- Categoria -->
             <div class="mb-3">
-              <label for="item-localizacao" class="form-label">Localização</label>
-              <select class="form-select" id="item-localizacao" name="item-localizacao">
+              <label for="item-categoria" class="form-label">Categoria</label>
+              <select class="form-select" id="item-categoria" name="item-categoria">
                 <option value="">Selecione</option>
-                <option value="geladeira">geladeira</option>
-                <option value="congelador">congelador</option>
-                <option value="despensa">despensa</option>
-                <option value="armário">armário</option>
-                <option value="balcão">balcão</option>
-                <option value="prateleira">prateleira</option>
-                <option value="pia">pia</option>
-                <option value="lavanderia">lavanderia</option>
-                <option value="banheiro">banheiro</option>
-                <option value="guarda-roupa">guarda-roupa</option>
-                <option value="penteadeira">penteadeira</option>
-                <option value="mesa">mesa</option>
-                <option value="estante">estante</option>
+                <option value="alimento">alimento</option>
+                <option value="bebida">bebida</option>
+                <option value="limpeza">limpeza</option>
+                <option value="higiene">higiene</option>
+                <option value="beleza">beleza</option>
+                <option value="farmácia">farmácia</option>
+                <option value="utilidade doméstica">utilidade doméstica</option>
                 <option value="outro(s)">outro(s)</option>
               </select>
             </div>
-
-            <!-- Campo manual para localização personalizada -->
-            <div class="mb-3 d-none" id="campo-localizacao-outra-wrapper">
-              <label for="campo-localizacao-outra" class="form-label">Digite a localização</label>
+            
+            <!-- Campo manual para categoria personalizada -->
+            <div class="mb-3 d-none" id="campo-categoria-outra-wrapper">
+              <label for="campo-categoria-outra" class="form-label">Digite a categoria</label>
               <input
                 type="text"
                 class="form-control"
-                id="campo-localizacao-outra"
-                name="campo-localizacao-outra"
-                placeholder="Digite a localização"
-              >
+                id="campo-categoria-outra"
+                name="campo-categoria-outra"
+                placeholder="Digite a categoria"
+                >
             </div>
-
+            
             <!-- Área reservada para mensagens futuras -->
             <div id="estoque-mensagem" class="small text-danger"></div>
           </div>
