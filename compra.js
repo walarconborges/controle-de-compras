@@ -1,10 +1,9 @@
-// Espera o HTML carregar completamente antes de executar o código
 document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_COMPRA = "controleComprasCompraAtual";
   const CHAVE_ESTOQUE = "controleComprasEstoque";
   const CHAVE_HISTORICO_COMPRAS = "controleComprasHistoricoCompras";
+  const CHAVE_MOVIMENTACOES_ESTOQUE = "controleComprasMovimentacoesEstoque";
 
-  // Seleciona os elementos principais da página
   const compraForm = document.getElementById("compra-form");
   const compraTabela = document.getElementById("compra-tabela");
   const totalCompra = document.getElementById("total-compra");
@@ -22,22 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const btnEditarItemRepetido = document.getElementById("btn-editar-item-repetido-compra");
   const btnSubstituirItemRepetido = document.getElementById("btn-substituir-item-repetido-compra");
 
-  // Cria instâncias dos modais do Bootstrap
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
-
-  modalElement.addEventListener("hidden.bs.modal", function () {
-    compraForm.reset();
-    
-    campoUnidadeOutraWrapper.classList.add("d-none");
-    campoUnidadeOutra.required = false;
-    campoUnidadeOutra.value = "";
-    
-    campoMensagem.textContent = "";
-    indiceEdicao = null;
-    itemPendente = null;
-    indiceItemRepetido = null;
-  });
-    
   const modalItemRepetidoBootstrap = bootstrap.Modal.getOrCreateInstance(modalItemRepetidoElement);
 
   let itensCompra = carregarCompra();
@@ -47,40 +31,32 @@ document.addEventListener("DOMContentLoaded", function () {
 
   renderizarTabela();
 
-  // Observa mudanças no campo de unidade
-  campoUnidade.addEventListener("change", function () {
-    if (campoUnidade.value === "outro(s)") {
-      campoUnidadeOutraWrapper.classList.remove("d-none");
-      campoUnidadeOutra.required = true;
-    } else {
-      campoUnidadeOutraWrapper.classList.add("d-none");
-      campoUnidadeOutra.required = false;
-      campoUnidadeOutra.value = "";
-    }
+  modalElement.addEventListener("hidden.bs.modal", function () {
+    limparFormulario();
+    campoMensagem.textContent = "";
+    indiceEdicao = null;
+    itemPendente = null;
+    indiceItemRepetido = null;
   });
 
-  // Escuta o envio do formulário
+  campoUnidade.addEventListener("change", function () {
+    alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
+  });
+
   compraForm.addEventListener("submit", function (event) {
     event.preventDefault();
-
     campoMensagem.textContent = "";
 
-    const item = document.getElementById("compra-item").value.trim();
-    const quantidadeTexto = document.getElementById("compra-quantidade").value.trim();
+    const nome = document.getElementById("compra-item").value.trim();
+    const quantidade = normalizarNumero(document.getElementById("compra-quantidade").value);
+    const valorUnitario = normalizarNumero(document.getElementById("compra-valor-unitario").value);
     let unidade = campoUnidade.value;
-    const valorUnitarioTexto = document.getElementById("compra-valor-unitario").value.trim();
 
     if (unidade === "outro(s)") {
       unidade = campoUnidadeOutra.value.trim();
     }
 
-    const quantidadeNormalizada = quantidadeTexto.replace(",", ".");
-    const valorUnitarioNormalizado = valorUnitarioTexto.replace(",", ".");
-
-    const quantidade = parseFloat(quantidadeNormalizada);
-    const valorUnitario = parseFloat(valorUnitarioNormalizado);
-
-    if (!item || !unidade || isNaN(quantidade) || isNaN(valorUnitario)) {
+    if (!nome || !unidade || isNaN(quantidade) || isNaN(valorUnitario)) {
       campoMensagem.textContent = "Preencha todos os campos corretamente.";
       return;
     }
@@ -91,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const novoItem = {
-      nome: item,
+      nome: nome,
       quantidade: quantidade,
       unidade: unidade,
       valorUnitario: valorUnitario
@@ -108,7 +84,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const indiceExistente = itensCompra.findIndex(function (itemExistente) {
       return (
-        itemExistente.nome.trim().toLowerCase() === item.trim().toLowerCase() &&
+        itemExistente.nome.trim().toLowerCase() === nome.trim().toLowerCase() &&
         itemExistente.unidade.trim().toLowerCase() === unidade.trim().toLowerCase()
       );
     });
@@ -154,43 +130,23 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const itemExistente = itensCompra[indiceItemRepetido];
-
-    document.getElementById("compra-item").value = itemExistente.nome;
-    document.getElementById("compra-quantidade").value = itemExistente.quantidade;
-    document.getElementById("compra-valor-unitario").value = itemExistente.valorUnitario;
-
-    const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
-      return option.value === itemExistente.unidade;
-    });
-
-    if (unidadeExisteNaLista) {
-      campoUnidade.value = itemExistente.unidade;
-      campoUnidadeOutraWrapper.classList.add("d-none");
-      campoUnidadeOutra.required = false;
-      campoUnidadeOutra.value = "";
-    } else {
-      campoUnidade.value = "outro(s)";
-      campoUnidadeOutraWrapper.classList.remove("d-none");
-      campoUnidadeOutra.required = true;
-      campoUnidadeOutra.value = "";
-    }
-
+    preencherFormulario(itensCompra[indiceItemRepetido]);
     indiceEdicao = indiceItemRepetido;
 
     itemPendente = null;
     indiceItemRepetido = null;
     modalItemRepetidoBootstrap.hide();
   });
-  
+
   btnFinalizarCompra.addEventListener("click", function () {
     if (itensCompra.length === 0) {
       campoMensagem.textContent = "Não há itens para finalizar a compra.";
       return;
     }
-    
+
     const estoqueAtual = carregarEstoque();
-    
+    const movimentacoesEstoque = carregarMovimentacoesEstoque();
+
     itensCompra.forEach(function (itemCompra) {
       const indiceExistenteNoEstoque = estoqueAtual.findIndex(function (itemEstoque) {
         return (
@@ -198,27 +154,56 @@ document.addEventListener("DOMContentLoaded", function () {
           itemEstoque.unidade.trim().toLowerCase() === itemCompra.unidade.trim().toLowerCase()
         );
       });
-      
+
       if (indiceExistenteNoEstoque !== -1) {
-        estoqueAtual[indiceExistenteNoEstoque].quantidade += itemCompra.quantidade;
+        const itemEstoque = estoqueAtual[indiceExistenteNoEstoque];
+        const quantidadeAnterior = Number(itemEstoque.quantidade) || 0;
+        const quantidadeNova = quantidadeAnterior + Number(itemCompra.quantidade);
+
+        itemEstoque.quantidade = quantidadeNova;
+
+        movimentacoesEstoque.push(criarMovimentacaoEstoque(
+          "entrada_compra",
+          {
+            nome: itemEstoque.nome,
+            unidade: itemEstoque.unidade,
+            localizacao: itemEstoque.localizacao || ""
+          },
+          quantidadeAnterior,
+          quantidadeNova
+        ));
       } else {
-        estoqueAtual.push({
+        const novoItemEstoque = {
           nome: itemCompra.nome,
           unidade: itemCompra.unidade,
-          quantidade: itemCompra.quantidade,
+          quantidade: Number(itemCompra.quantidade),
           localizacao: ""
-        });
+        };
+
+        estoqueAtual.push(novoItemEstoque);
+
+        movimentacoesEstoque.push(criarMovimentacaoEstoque(
+          "entrada_compra",
+          {
+            nome: novoItemEstoque.nome,
+            unidade: novoItemEstoque.unidade,
+            localizacao: novoItemEstoque.localizacao || ""
+          },
+          0,
+          novoItemEstoque.quantidade
+        ));
       }
     });
-    
-    localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(estoqueAtual));
-    
+
+    salvarEstoque(estoqueAtual);
+    salvarMovimentacoesEstoque(movimentacoesEstoque);
+
     const historicoCompras = carregarHistoricoCompras();
-    
+
     const totalCompraFinalizada = itensCompra.reduce(function (total, item) {
-      return total + (item.quantidade * item.valorUnitario);
+      return total + (Number(item.quantidade) * Number(item.valorUnitario));
     }, 0);
-    
+
     const registroCompra = {
       data: new Date().toISOString(),
       total: totalCompraFinalizada,
@@ -226,30 +211,30 @@ document.addEventListener("DOMContentLoaded", function () {
       itens: itensCompra.map(function (item) {
         return {
           nome: item.nome,
-          quantidade: item.quantidade,
+          quantidade: Number(item.quantidade),
           unidade: item.unidade,
-          valorUnitario: item.valorUnitario,
-          subtotal: item.quantidade * item.valorUnitario
+          valorUnitario: Number(item.valorUnitario),
+          subtotal: Number(item.quantidade) * Number(item.valorUnitario)
         };
       })
     };
-    
+
     historicoCompras.push(registroCompra);
     salvarHistoricoCompras(historicoCompras);
-    
+
     itensCompra = [];
     salvarCompra();
     renderizarTabela();
     campoMensagem.textContent = "Compra finalizada e estoque atualizado.";
   });
-  
+
   function carregarEstoque() {
     const dadosSalvos = localStorage.getItem(CHAVE_ESTOQUE);
-    
+
     if (!dadosSalvos) {
       return [];
     }
-    
+
     try {
       return JSON.parse(dadosSalvos);
     } catch (erro) {
@@ -257,7 +242,11 @@ document.addEventListener("DOMContentLoaded", function () {
       return [];
     }
   }
-  
+
+  function salvarEstoque(estoque) {
+    localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(estoque));
+  }
+
   function carregarCompra() {
     const dadosSalvos = localStorage.getItem(CHAVE_COMPRA);
 
@@ -275,11 +264,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function carregarHistoricoCompras() {
     const dadosSalvos = localStorage.getItem(CHAVE_HISTORICO_COMPRAS);
-    
+
     if (!dadosSalvos) {
       return [];
     }
-    
+
     try {
       return JSON.parse(dadosSalvos);
     } catch (erro) {
@@ -287,13 +276,49 @@ document.addEventListener("DOMContentLoaded", function () {
       return [];
     }
   }
-  
-function salvarHistoricoCompras(historico) {
-  localStorage.setItem(CHAVE_HISTORICO_COMPRAS, JSON.stringify(historico));
-}
+
+  function salvarHistoricoCompras(historico) {
+    localStorage.setItem(CHAVE_HISTORICO_COMPRAS, JSON.stringify(historico));
+  }
 
   function salvarCompra() {
     localStorage.setItem(CHAVE_COMPRA, JSON.stringify(itensCompra));
+  }
+
+  function carregarMovimentacoesEstoque() {
+    const dadosSalvos = localStorage.getItem(CHAVE_MOVIMENTACOES_ESTOQUE);
+
+    if (!dadosSalvos) {
+      return [];
+    }
+
+    try {
+      return JSON.parse(dadosSalvos);
+    } catch (erro) {
+      console.error("Erro ao carregar movimentações do estoque:", erro);
+      return [];
+    }
+  }
+
+  function salvarMovimentacoesEstoque(movimentacoes) {
+    localStorage.setItem(CHAVE_MOVIMENTACOES_ESTOQUE, JSON.stringify(movimentacoes));
+  }
+
+  function criarMovimentacaoEstoque(tipo, item, quantidadeAnterior, quantidadeNova) {
+    const anterior = Number(quantidadeAnterior) || 0;
+    const nova = Number(quantidadeNova) || 0;
+
+    return {
+      data: new Date().toISOString(),
+      tipo: tipo,
+      nome: item.nome,
+      unidade: item.unidade,
+      localizacao: item.localizacao || "",
+      quantidadeAnterior: anterior,
+      quantidadeNova: nova,
+      variacao: nova - anterior,
+      saldoResultante: nova
+    };
   }
 
   function renderizarTabela() {
@@ -314,7 +339,7 @@ function salvarHistoricoCompras(historico) {
     let totalAcumulado = 0;
 
     itensCompra.forEach(function (item, indice) {
-      const subtotal = item.quantidade * item.valorUnitario;
+      const subtotal = Number(item.quantidade) * Number(item.valorUnitario);
       totalAcumulado += subtotal;
 
       const novaLinha = document.createElement("tr");
@@ -337,67 +362,108 @@ function salvarHistoricoCompras(historico) {
       `;
 
       compraTabela.appendChild(novaLinha);
-      
+
       const botaoEditar = novaLinha.querySelector(".btn-editar");
       const botaoRemover = novaLinha.querySelector(".btn-remover");
-      
+
       botaoEditar.addEventListener("click", function () {
-        const itemExistente = itensCompra[indice];
-        
-        document.getElementById("compra-item").value = itemExistente.nome;
-        document.getElementById("compra-quantidade").value = itemExistente.quantidade;
-        document.getElementById("compra-valor-unitario").value = itemExistente.valorUnitario;
-        
-        const unidadeExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
-          return option.value === itemExistente.unidade;
-        });
-        
-        if (unidadeExisteNaLista) {
-          campoUnidade.value = itemExistente.unidade;
-          campoUnidadeOutraWrapper.classList.add("d-none");
-          campoUnidadeOutra.required = false;
-          campoUnidadeOutra.value = "";
-        } else {
-          campoUnidade.value = "outro(s)";
-          campoUnidadeOutraWrapper.classList.remove("d-none");
-          campoUnidadeOutra.required = true;
-          campoUnidadeOutra.value = "";
-        }
-        
+        preencherFormulario(itensCompra[indice]);
         indiceEdicao = indice;
         modalBootstrap.show();
       });
-      
+
       botaoRemover.addEventListener("click", function () {
         const desejaRemover = confirm("Deseja remover este item da compra?");
-        
+
         if (!desejaRemover) {
           return;
         }
-        
+
         itensCompra.splice(indice, 1);
         salvarCompra();
         renderizarTabela();
       });
     });
-    
+
     totalCompra.textContent = formatarMoeda(totalAcumulado);
   }
-  
-  function limparFormularioFecharModal() {
+
+  function preencherFormulario(item) {
+    document.getElementById("compra-item").value = item.nome;
+    document.getElementById("compra-quantidade").value = item.quantidade;
+    document.getElementById("compra-valor-unitario").value = item.valorUnitario;
+
+    preencherSelectOuOutro(
+      campoUnidade,
+      campoUnidadeOutraWrapper,
+      campoUnidadeOutra,
+      item.unidade
+    );
+  }
+
+  function preencherSelectOuOutro(selectElement, wrapperElement, inputElement, valor) {
+    const valorExisteNaLista = Array.from(selectElement.options).some(function (option) {
+      return option.value === valor;
+    });
+
+    if (!valor) {
+      selectElement.value = "";
+      wrapperElement.classList.add("d-none");
+      inputElement.required = false;
+      inputElement.value = "";
+      return;
+    }
+
+    if (valorExisteNaLista) {
+      selectElement.value = valor;
+      wrapperElement.classList.add("d-none");
+      inputElement.required = false;
+      inputElement.value = "";
+      return;
+    }
+
+    selectElement.value = "outro(s)";
+    wrapperElement.classList.remove("d-none");
+    inputElement.required = true;
+    inputElement.value = valor;
+  }
+
+  function alternarCampoOutro(selectElement, wrapperElement, inputElement) {
+    if (selectElement.value === "outro(s)") {
+      wrapperElement.classList.remove("d-none");
+      inputElement.required = true;
+    } else {
+      wrapperElement.classList.add("d-none");
+      inputElement.required = false;
+      inputElement.value = "";
+    }
+  }
+
+  function limparFormulario() {
     compraForm.reset();
     campoUnidadeOutraWrapper.classList.add("d-none");
     campoUnidadeOutra.required = false;
     campoUnidadeOutra.value = "";
+  }
+
+  function limparFormularioFecharModal() {
+    limparFormulario();
     modalBootstrap.hide();
   }
 
+  function normalizarNumero(valor) {
+    return parseFloat(String(valor).trim().replace(",", "."));
+  }
+
   function formatarNumero(valor) {
-    return valor.toLocaleString("pt-BR");
+    return Number(valor).toLocaleString("pt-BR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
   }
 
   function formatarMoeda(valor) {
-    return valor.toLocaleString("pt-BR", {
+    return Number(valor).toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
