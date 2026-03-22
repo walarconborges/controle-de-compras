@@ -15,16 +15,10 @@
         <div class="app-box">
           <header class="mb-4 text-center">
             <h1 class="h3 mb-2">Controle de Compras</h1>
-            <p class="text-muted mb-0">Escolha como deseja acessar o site.</p>
+            <p class="text-muted mb-0">Escolha como deseja acessar o sistema.</p>
           </header>
 
-          <!--
-            Formulário de login.
-            Esta estrutura já fica pronta para futura integração com banco de dados.
-            Por enquanto, o envio será tratado apenas no JavaScript local.
-          -->
-          <form id="login-form">
-            <!-- Campo de e-mail do usuário -->
+          <form id="login-form" novalidate>
             <div class="mb-3">
               <label for="email" class="form-label">E-mail</label>
               <input
@@ -38,7 +32,6 @@
               >
             </div>
 
-            <!-- Campo de senha do usuário -->
             <div class="mb-3">
               <label for="senha" class="form-label">Senha</label>
               <input
@@ -52,49 +45,24 @@
               >
             </div>
 
-            <!--
-              Área reservada para mensagens de retorno do login.
-              Exemplos futuros:
-              - e-mail inválido
-              - senha incorreta
-              - usuário não encontrado
-              - erro de conexão com banco de dados
-            -->
-            <div id="login-message" class="mb-3 text-danger small"></div>
+            <div id="login-message" class="mb-3 text-danger small" aria-live="polite"></div>
 
-            <!--
-              Campo oculto reservado para uso futuro.
-              Pode ser usado depois para token, identificador de sessão
-              ou qualquer dado retornado pelo sistema de autenticação.
-              Aguardando escolha do banco de dados.
-            -->
             <input type="hidden" id="auth-token" name="auth-token" value="">
 
             <div class="d-grid gap-2">
-              <!--
-                Botão principal de login.
-                No futuro, este envio poderá consultar banco de dados
-                ou serviço de autenticação.
-              -->
               <button type="submit" class="btn btn-primary">
                 Entrar
               </button>
 
-              <!-- Acesso livre ao site sem login -->
               <a href="homepage.html" class="btn btn-outline-secondary">
                 Acessar como visitante
               </a>
             </div>
           </form>
 
-          <!--
-            Bloco de observação técnica.
-            Serve apenas como referência para você no futuro.
-            Pode ser removido depois, se quiser.
-          -->
           <div class="mt-4">
             <p class="small text-muted mb-0">
-              Integração de autenticação aguardando escolha do banco de dados.
+              O login ainda é apenas simulado nesta fase do projeto.
             </p>
           </div>
         </div>
