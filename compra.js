@@ -10,6 +10,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const campoItem = document.getElementById("compra-item");
   const sugestoesCompra = document.getElementById("sugestoes-compra");
 
+  const campoQuantidade = document.getElementById("compra-quantidade");
+  const campoValorUnitario = document.getElementById("compra-valor-unitario");
+
   const campoUnidade = document.getElementById("compra-unidade");
   const campoUnidadeOutraWrapper = document.getElementById("campo-compra-unidade-outra-wrapper");
   const campoUnidadeOutra = document.getElementById("campo-compra-unidade-outra");
@@ -47,6 +50,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   campoItem.addEventListener("input", function () {
+    atualizarCategoriaPeloNomeDigitado();
     renderizarSugestoesDoEstoque();
   });
 
@@ -61,33 +65,55 @@ document.addEventListener("DOMContentLoaded", function () {
     campoMensagem.textContent = "";
 
     const nome = campoItem.value.trim();
-    const quantidade = normalizarNumero(document.getElementById("compra-quantidade").value);
-    const valorUnitario = normalizarNumero(document.getElementById("compra-valor-unitario").value);
+    const quantidade = normalizarNumero(campoQuantidade.value);
+    const valorUnitario = normalizarNumero(campoValorUnitario.value);
     let unidade = campoUnidade.value;
 
     if (unidade === "outro(s)") {
       unidade = campoUnidadeOutra.value.trim();
     }
 
-    if (!nome || !unidade || isNaN(quantidade) || isNaN(valorUnitario)) {
+    if (!nome || !unidade || Number.isNaN(quantidade) || Number.isNaN(valorUnitario)) {
       campoMensagem.textContent = "Preencha todos os campos corretamente.";
       return;
     }
 
-    if (quantidade < 0 || valorUnitario < 0) {
-      campoMensagem.textContent = "Quantidade e valor não podem ser negativos.";
+    if (quantidade <= 0 || valorUnitario < 0) {
+      campoMensagem.textContent = "Quantidade deve ser maior que zero e o valor não pode ser negativo.";
       return;
     }
+
+    const itemCorrespondenteNoEstoque = buscarItemNoEstoquePorNome(nome);
 
     const novoItem = {
       nome: nome,
       quantidade: quantidade,
       unidade: unidade,
       valorUnitario: valorUnitario,
-      categoria: categoriaSelecionadaDoEstoque || ""
+      categoria: itemCorrespondenteNoEstoque
+        ? itemCorrespondenteNoEstoque.categoria || ""
+        : categoriaSelecionadaDoEstoque || ""
     };
 
+    const indiceExistente = itensCompra.findIndex(function (itemExistente, indice) {
+      if (indiceEdicao !== null && indice === indiceEdicao) {
+        return false;
+      }
+
+      return (
+        normalizarTexto(itemExistente.nome) === normalizarTexto(nome) &&
+        normalizarTexto(itemExistente.unidade) === normalizarTexto(unidade)
+      );
+    });
+
     if (indiceEdicao !== null) {
+      if (indiceExistente !== -1) {
+        itemPendente = novoItem;
+        indiceItemRepetido = indiceExistente;
+        modalItemRepetidoBootstrap.show();
+        return;
+      }
+
       itensCompra[indiceEdicao] = novoItem;
       indiceEdicao = null;
       salvarCompra();
@@ -95,13 +121,6 @@ document.addEventListener("DOMContentLoaded", function () {
       limparFormularioFecharModal();
       return;
     }
-
-    const indiceExistente = itensCompra.findIndex(function (itemExistente) {
-      return (
-        itemExistente.nome.trim().toLowerCase() === nome.trim().toLowerCase() &&
-        itemExistente.unidade.trim().toLowerCase() === unidade.trim().toLowerCase()
-      );
-    });
 
     if (indiceExistente !== -1) {
       itemPendente = novoItem;
@@ -134,25 +153,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
     itemPendente = null;
     indiceItemRepetido = null;
+    indiceEdicao = null;
 
     modalItemRepetidoBootstrap.hide();
     limparFormularioFecharModal();
   });
 
   btnEditarItemRepetido.addEventListener("click", function () {
-    if (indiceItemRepetido === null) {
+    if (!itemPendente) {
       return;
     }
 
-    preencherFormulario(itensCompra[indiceItemRepetido]);
+    preencherFormulario(itemPendente);
     indiceEdicao = indiceItemRepetido;
 
     itemPendente = null;
     indiceItemRepetido = null;
     modalItemRepetidoBootstrap.hide();
+    modalBootstrap.show();
   });
 
   btnFinalizarCompra.addEventListener("click", function () {
+    campoMensagem.textContent = "";
+
     if (itensCompra.length === 0) {
       campoMensagem.textContent = "Não há itens para finalizar a compra.";
       return;
@@ -164,8 +187,8 @@ document.addEventListener("DOMContentLoaded", function () {
     itensCompra.forEach(function (itemCompra) {
       const indiceExistenteNoEstoque = estoqueAtual.findIndex(function (itemEstoque) {
         return (
-          itemEstoque.nome.trim().toLowerCase() === itemCompra.nome.trim().toLowerCase() &&
-          itemEstoque.unidade.trim().toLowerCase() === itemCompra.unidade.trim().toLowerCase()
+          normalizarTexto(itemEstoque.nome) === normalizarTexto(itemCompra.nome) &&
+          normalizarTexto(itemEstoque.unidade) === normalizarTexto(itemCompra.unidade)
         );
       });
 
@@ -176,16 +199,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
         itemEstoque.quantidade = quantidadeNova;
 
-        movimentacoesEstoque.push(criarMovimentacaoEstoque(
-          "entrada_compra",
-          {
-            nome: itemEstoque.nome,
-            unidade: itemEstoque.unidade,
-            categoria: itemEstoque.categoria || ""
-          },
-          quantidadeAnterior,
-          quantidadeNova
-        ));
+        if (!itemEstoque.categoria && itemCompra.categoria) {
+          itemEstoque.categoria = itemCompra.categoria;
+        }
+
+        movimentacoesEstoque.push(
+          criarMovimentacaoEstoque(
+            "entrada_compra",
+            {
+              nome: itemEstoque.nome,
+              unidade: itemEstoque.unidade,
+              categoria: itemEstoque.categoria || ""
+            },
+            quantidadeAnterior,
+            quantidadeNova
+          )
+        );
       } else {
         const novoItemEstoque = {
           nome: itemCompra.nome,
@@ -196,16 +225,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
         estoqueAtual.push(novoItemEstoque);
 
-        movimentacoesEstoque.push(criarMovimentacaoEstoque(
-          "entrada_compra",
-          {
-            nome: novoItemEstoque.nome,
-            unidade: novoItemEstoque.unidade,
-            categoria: novoItemEstoque.categoria || ""
-          },
-          0,
-          novoItemEstoque.quantidade
-        ));
+        movimentacoesEstoque.push(
+          criarMovimentacaoEstoque(
+            "entrada_compra",
+            {
+              nome: novoItemEstoque.nome,
+              unidade: novoItemEstoque.unidade,
+              categoria: novoItemEstoque.categoria || ""
+            },
+            0,
+            novoItemEstoque.quantidade
+          )
+        );
       }
     });
 
@@ -215,7 +246,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const historicoCompras = carregarHistoricoCompras();
 
     const totalCompraFinalizada = itensCompra.reduce(function (total, item) {
-      return total + (Number(item.quantidade) * Number(item.valorUnitario));
+      return total + Number(item.quantidade) * Number(item.valorUnitario);
     }, 0);
 
     const registroCompra = {
@@ -251,7 +282,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     try {
-      return JSON.parse(dadosSalvos);
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
     } catch (erro) {
       console.error("Erro ao carregar estoque:", erro);
       return [];
@@ -270,7 +302,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     try {
-      return JSON.parse(dadosSalvos);
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
     } catch (erro) {
       console.error("Erro ao carregar compra:", erro);
       return [];
@@ -285,7 +318,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     try {
-      return JSON.parse(dadosSalvos);
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
     } catch (erro) {
       console.error("Erro ao carregar histórico de compras:", erro);
       return [];
@@ -308,7 +342,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     try {
-      return JSON.parse(dadosSalvos);
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
     } catch (erro) {
       console.error("Erro ao carregar movimentações do estoque:", erro);
       return [];
@@ -369,9 +404,9 @@ document.addEventListener("DOMContentLoaded", function () {
             </button>
           </div>
         </td>
-        <td>${item.nome}</td>
+        <td>${escaparHtml(item.nome)}</td>
         <td>${formatarNumero(item.quantidade)}</td>
-        <td>${item.unidade}</td>
+        <td>${escaparHtml(item.unidade)}</td>
         <td>R$ ${formatarMoeda(item.valorUnitario)}</td>
         <td>R$ ${formatarMoeda(subtotal)}</td>
       `;
@@ -384,6 +419,7 @@ document.addEventListener("DOMContentLoaded", function () {
       botaoEditar.addEventListener("click", function () {
         preencherFormulario(itensCompra[indice]);
         indiceEdicao = indice;
+        campoMensagem.textContent = "";
         modalBootstrap.show();
       });
 
@@ -405,8 +441,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function preencherFormulario(item) {
     campoItem.value = item.nome;
-    document.getElementById("compra-quantidade").value = item.quantidade;
-    document.getElementById("compra-valor-unitario").value = item.valorUnitario;
+    campoQuantidade.value = item.quantidade;
+    campoValorUnitario.value = item.valorUnitario;
     categoriaSelecionadaDoEstoque = item.categoria || "";
 
     preencherSelectOuOutro(
@@ -418,7 +454,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderizarSugestoesDoEstoque() {
-    const termoDigitado = campoItem.value.trim().toLowerCase();
+    const termoDigitado = normalizarTexto(campoItem.value);
 
     limparSugestoes();
 
@@ -429,12 +465,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const estoqueAtual = carregarEstoque();
 
-    const sugestoes = estoqueAtual.filter(function (item) {
-      return item.nome && item.nome.trim().toLowerCase().includes(termoDigitado);
-    }).slice(0, 5);
+    const sugestoes = estoqueAtual
+      .filter(function (item) {
+        return normalizarTexto(item.nome).includes(termoDigitado);
+      })
+      .slice(0, 5);
 
     if (sugestoes.length === 0) {
-      categoriaSelecionadaDoEstoque = "";
       return;
     }
 
@@ -506,6 +543,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function limparFormulario() {
     compraForm.reset();
+    campoUnidade.value = "unidade(s)";
     campoUnidadeOutraWrapper.classList.add("d-none");
     campoUnidadeOutra.required = false;
     campoUnidadeOutra.value = "";
@@ -518,8 +556,41 @@ document.addEventListener("DOMContentLoaded", function () {
     modalBootstrap.hide();
   }
 
+  function atualizarCategoriaPeloNomeDigitado() {
+    const nome = campoItem.value.trim();
+
+    if (!nome) {
+      categoriaSelecionadaDoEstoque = "";
+      return;
+    }
+
+    const itemCorrespondente = buscarItemNoEstoquePorNome(nome);
+    categoriaSelecionadaDoEstoque = itemCorrespondente ? itemCorrespondente.categoria || "" : "";
+  }
+
+  function buscarItemNoEstoquePorNome(nome) {
+    const nomeNormalizado = normalizarTexto(nome);
+
+    if (!nomeNormalizado) {
+      return null;
+    }
+
+    const estoqueAtual = carregarEstoque();
+
+    return (
+      estoqueAtual.find(function (item) {
+        return normalizarTexto(item.nome) === nomeNormalizado;
+      }) || null
+    );
+  }
+
   function normalizarNumero(valor) {
-    return parseFloat(String(valor).trim().replace(",", "."));
+    const texto = String(valor || "").trim().replace(/\s+/g, "").replace(",", ".");
+    return parseFloat(texto);
+  }
+
+  function normalizarTexto(valor) {
+    return String(valor || "").trim().toLowerCase();
   }
 
   function formatarNumero(valor) {
@@ -534,5 +605,14 @@ document.addEventListener("DOMContentLoaded", function () {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  }
+
+  function escaparHtml(valor) {
+    return String(valor || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 });
