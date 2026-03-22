@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const compraForm = document.getElementById("compra-form");
   const compraTabela = document.getElementById("compra-tabela");
   const totalCompra = document.getElementById("total-compra");
+  const campoItem = document.getElementById("compra-item");
 
   const campoUnidade = document.getElementById("compra-unidade");
   const campoUnidadeOutraWrapper = document.getElementById("campo-compra-unidade-outra-wrapper");
@@ -41,6 +42,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   campoUnidade.addEventListener("change", function () {
     alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
+  });
+
+  campoItem.addEventListener("input", function () {
+    preencherSugestaoDoEstoque();
   });
 
   compraForm.addEventListener("submit", function (event) {
@@ -167,7 +172,7 @@ document.addEventListener("DOMContentLoaded", function () {
           {
             nome: itemEstoque.nome,
             unidade: itemEstoque.unidade,
-            localizacao: itemEstoque.localizacao || ""
+            categoria: itemEstoque.categoria || ""
           },
           quantidadeAnterior,
           quantidadeNova
@@ -177,7 +182,7 @@ document.addEventListener("DOMContentLoaded", function () {
           nome: itemCompra.nome,
           unidade: itemCompra.unidade,
           quantidade: Number(itemCompra.quantidade),
-          localizacao: ""
+          categoria: ""
         };
 
         estoqueAtual.push(novoItemEstoque);
@@ -187,7 +192,7 @@ document.addEventListener("DOMContentLoaded", function () {
           {
             nome: novoItemEstoque.nome,
             unidade: novoItemEstoque.unidade,
-            localizacao: novoItemEstoque.localizacao || ""
+            categoria: novoItemEstoque.categoria || ""
           },
           0,
           novoItemEstoque.quantidade
@@ -313,7 +318,7 @@ document.addEventListener("DOMContentLoaded", function () {
       tipo: tipo,
       nome: item.nome,
       unidade: item.unidade,
-      localizacao: item.localizacao || "",
+      categoria: item.categoria || "",
       quantidadeAnterior: anterior,
       quantidadeNova: nova,
       variacao: nova - anterior,
@@ -449,6 +454,38 @@ document.addEventListener("DOMContentLoaded", function () {
   function limparFormularioFecharModal() {
     limparFormulario();
     modalBootstrap.hide();
+  }
+
+    function limparFormularioFecharModal() {
+    limparFormulario();
+    modalBootstrap.hide();
+  }
+
+  function preencherSugestaoDoEstoque() {
+    const termoDigitado = campoItem.value.trim().toLowerCase();
+
+    if (!termoDigitado) {
+      return;
+    }
+
+    const estoqueAtual = carregarEstoque();
+
+    const itemEncontrado = estoqueAtual.find(function (item) {
+      return item.nome && item.nome.trim().toLowerCase().includes(termoDigitado);
+    });
+
+    if (!itemEncontrado) {
+      return;
+    }
+
+    campoItem.value = itemEncontrado.nome;
+
+    preencherSelectOuOutro(
+      campoUnidade,
+      campoUnidadeOutraWrapper,
+      campoUnidadeOutra,
+      itemEncontrado.unidade || ""
+    );
   }
 
   function normalizarNumero(valor) {
