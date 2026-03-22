@@ -72,14 +72,24 @@
 
         <!-- Aba: Média de Consumo -->
         <section id="media-consumo" class="tab-content-section active">
-          <div class="mb-3">
-            <label for="visualizacao-consumo" class="form-label">Visualização</label>
-            <select class="form-select" id="visualizacao-consumo" name="visualizacao-consumo">
-              <option value="tabela" selected>Tabela</option>
-              <option value="lista">Lista</option>
-              <option value="barras">Gráfico de barras</option>
-              <option value="linha-do-tempo">Linha do tempo</option>
-            </select>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label for="visualizacao-consumo" class="form-label">Visualização</label>
+              <select class="form-select" id="visualizacao-consumo" name="visualizacao-consumo">
+                <option value="tabela" selected>Tabela</option>
+                <option value="lista">Lista</option>
+                <option value="barras">Gráfico de barras</option>
+                <option value="linha-do-tempo">Linha do tempo</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="agrupamento-consumo" class="form-label">Agrupar por</label>
+              <select class="form-select" id="agrupamento-consumo" name="agrupamento-consumo">
+                <option value="item" selected>Item</option>
+                <option value="categoria">Categoria</option>
+              </select>
+            </div>
           </div>
 
           <div class="resultado-visualizacao" id="resultado-consumo">
