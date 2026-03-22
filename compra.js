@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const novoItem = {
-      item: item,
+      nome: item,
       quantidade: quantidade,
       unidade: unidade,
       valorUnitario: valorUnitario
@@ -107,7 +107,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const indiceExistente = itensCompra.findIndex(function (itemExistente) {
       return (
-        itemExistente.item.trim().toLowerCase() === item.trim().toLowerCase() &&
+        itemExistente.nome.trim().toLowerCase() === item.trim().toLowerCase() &&
         itemExistente.unidade.trim().toLowerCase() === unidade.trim().toLowerCase()
       );
     });
@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const itemExistente = itensCompra[indiceItemRepetido];
 
-    document.getElementById("compra-item").value = itemExistente.item;
+    document.getElementById("compra-item").value = itemExistente.nome;
     document.getElementById("compra-quantidade").value = itemExistente.quantidade;
     document.getElementById("compra-valor-unitario").value = itemExistente.valorUnitario;
 
@@ -193,7 +193,7 @@ document.addEventListener("DOMContentLoaded", function () {
     itensCompra.forEach(function (itemCompra) {
       const indiceExistenteNoEstoque = estoqueAtual.findIndex(function (itemEstoque) {
         return (
-          itemEstoque.nome.trim().toLowerCase() === itemCompra.item.trim().toLowerCase() &&
+          itemEstoque.nome.trim().toLowerCase() === itemCompra.nome.trim().toLowerCase() &&
           itemEstoque.unidade.trim().toLowerCase() === itemCompra.unidade.trim().toLowerCase()
         );
       });
@@ -202,7 +202,7 @@ document.addEventListener("DOMContentLoaded", function () {
         estoqueAtual[indiceExistenteNoEstoque].quantidade += itemCompra.quantidade;
       } else {
         estoqueAtual.push({
-          nome: itemCompra.item,
+          nome: itemCompra.nome,
           unidade: itemCompra.unidade,
           quantidade: itemCompra.quantidade,
           localizacao: ""
@@ -285,7 +285,7 @@ document.addEventListener("DOMContentLoaded", function () {
             </button>
           </div>
         </td>
-        <td>${item.item}</td>
+        <td>${item.nome}</td>
         <td>${formatarNumero(item.quantidade)}</td>
         <td>${item.unidade}</td>
         <td>R$ ${formatarMoeda(item.valorUnitario)}</td>
@@ -300,7 +300,7 @@ document.addEventListener("DOMContentLoaded", function () {
       botaoEditar.addEventListener("click", function () {
         const itemExistente = itensCompra[indice];
         
-        document.getElementById("compra-item").value = itemExistente.item;
+        document.getElementById("compra-item").value = itemExistente.nome;
         document.getElementById("compra-quantidade").value = itemExistente.quantidade;
         document.getElementById("compra-valor-unitario").value = itemExistente.valorUnitario;
         
