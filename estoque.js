@@ -427,7 +427,7 @@ document.addEventListener("DOMContentLoaded", function () {
         itensEstoque[indice].quantidade = quantidadeAtual;
         
         salvarEstoque();
-        renderizarTabela();]
+        renderizarTabela();
       });
       
       campoQuantidade.addEventListener("change", function () {
