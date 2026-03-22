@@ -301,7 +301,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!item.localizacao || item.localizacao.trim() === "") {
         novaLinha.classList.add("status-location-empty");
       }
-      
+
       novaLinha.innerHTML = `
       <td>
       <div class="d-flex gap-2">
@@ -315,13 +315,35 @@ document.addEventListener("DOMContentLoaded", function () {
       </td>
       <td>${item.nome}</td>
       <td>${item.unidade}</td>
-      <td>${formatarNumero(item.quantidade)}</td>
-      <td>${item.localizacao || ""}</td>
-      `;
+      <td>
+      <div class="d-flex align-items-center gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary btn-diminuir" data-indice="${indice}">
+      -
+      </button>
+      
+          <input
+          type="number"
+          class="form-control form-control-sm campo-quantidade"
+          data-indice="${indice}"
+          value="${item.quantidade}"
+          min="0"
+          step="0.01"
+          >
+          
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-aumentar" data-indice="${indice}">
+              +
+              </button>
+              </div>
+              </td>
+              <td>${item.localizacao || ""}</td>
+              `;
       
       estoqueTabela.appendChild(novaLinha);
       const botaoEditar = novaLinha.querySelector(".btn-editar");
       const botaoRemover = novaLinha.querySelector(".btn-remover");
+      const botaoDiminuir = novaLinha.querySelector(".btn-diminuir");
+      const botaoAumentar = novaLinha.querySelector(".btn-aumentar");
+      const campoQuantidade = novaLinha.querySelector(".campo-quantidade");
       
       botaoEditar.addEventListener("click", function () {
         const itemExistente = itensEstoque[indice];
@@ -377,6 +399,47 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         
         itensEstoque.splice(indice, 1);
+        salvarEstoque();
+        renderizarTabela();
+      });
+
+      botaoDiminuir.addEventListener("click", function () {
+        let quantidadeAtual = parseFloat(itensEstoque[indice].quantidade);
+        if (isNaN(quantidadeAtual)) {
+          quantidadeAtual = 0;
+        }
+        
+        quantidadeAtual = Math.max(0, quantidadeAtual - 1);
+        itensEstoque[indice].quantidade = quantidadeAtual;
+        
+        salvarEstoque();
+        renderizarTabela();
+      });
+      
+      botaoAumentar.addEventListener("click", function () {
+        let quantidadeAtual = parseFloat(itensEstoque[indice].quantidade);
+        
+        if (isNaN(quantidadeAtual)) {
+          quantidadeAtual = 0;
+        }
+        
+        quantidadeAtual = quantidadeAtual + 1;
+        itensEstoque[indice].quantidade = quantidadeAtual;
+        
+        salvarEstoque();
+        renderizarTabela();]
+      });
+      
+      campoQuantidade.addEventListener("change", function () {
+        const valorDigitado = campoQuantidade.value.trim().replace(",", ".");
+        let novaQuantidade = parseFloat(valorDigitado);
+        
+        if (isNaN(novaQuantidade) || novaQuantidade < 0) {
+          novaQuantidade = 0;
+        }
+        
+        itensEstoque[indice].quantidade = novaQuantidade;
+        
         salvarEstoque();
         renderizarTabela();
       });
