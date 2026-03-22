@@ -2,6 +2,7 @@
 document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_COMPRA = "controleComprasCompraAtual";
   const CHAVE_ESTOQUE = "controleComprasEstoque";
+  const CHAVE_HISTORICO_COMPRAS = "controleComprasHistoricoCompras";
 
   // Seleciona os elementos principais da página
   const compraForm = document.getElementById("compra-form");
@@ -212,6 +213,30 @@ document.addEventListener("DOMContentLoaded", function () {
     
     localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(estoqueAtual));
     
+    const historicoCompras = carregarHistoricoCompras();
+    
+    const totalCompraFinalizada = itensCompra.reduce(function (total, item) {
+      return total + (item.quantidade * item.valorUnitario);
+    }, 0);
+    
+    const registroCompra = {
+      data: new Date().toISOString(),
+      total: totalCompraFinalizada,
+      quantidadeItens: itensCompra.length,
+      itens: itensCompra.map(function (item) {
+        return {
+          nome: item.nome,
+          quantidade: item.quantidade,
+          unidade: item.unidade,
+          valorUnitario: item.valorUnitario,
+          subtotal: item.quantidade * item.valorUnitario
+        };
+      })
+    };
+    
+    historicoCompras.push(registroCompra);
+    salvarHistoricoCompras(historicoCompras);
+    
     itensCompra = [];
     salvarCompra();
     renderizarTabela();
@@ -247,6 +272,25 @@ document.addEventListener("DOMContentLoaded", function () {
       return [];
     }
   }
+
+  function carregarHistoricoCompras() {
+    const dadosSalvos = localStorage.getItem(CHAVE_HISTORICO_COMPRAS);
+    
+    if (!dadosSalvos) {
+      return [];
+    }
+    
+    try {
+      return JSON.parse(dadosSalvos);
+    } catch (erro) {
+      console.error("Erro ao carregar histórico de compras:", erro);
+      return [];
+    }
+  }
+  
+function salvarHistoricoCompras(historico) {
+  localStorage.setItem(CHAVE_HISTORICO_COMPRAS, JSON.stringify(historico));
+}
 
   function salvarCompra() {
     localStorage.setItem(CHAVE_COMPRA, JSON.stringify(itensCompra));
