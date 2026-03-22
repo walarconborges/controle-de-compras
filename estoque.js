@@ -20,7 +20,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Cria uma instância do modal do Bootstrap para poder fechá-lo via JavaScript
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
-
+  
+  modalElement.addEventListener("hidden.bs.modal", function () {
+    estoqueForm.reset();
+    
+    campoUnidadeOutraWrapper.classList.add("d-none");
+    campoUnidadeOutra.required = false;
+    campoUnidadeOutra.value = "";
+    
+    campoLocalizacaoOutraWrapper.classList.add("d-none");
+    campoLocalizacaoOutra.required = false;
+    campoLocalizacaoOutra.value = "";
+    
+    campoMensagem.textContent = "";
+    indiceEdicao = null;
+    itemPendente = null;
+    indiceItemRepetido = null;
+  });
+  
   const modalItemRepetidoBootstrap = bootstrap.Modal.getOrCreateInstance(modalItemRepetidoElement);
   
   let indiceEdicao = null;
