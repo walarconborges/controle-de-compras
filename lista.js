@@ -1,8 +1,6 @@
-// Espera o HTML carregar completamente antes de executar o código
 document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_ESTOQUE = "controleComprasEstoque";
 
-  // Seleciona os elementos principais da página
   const listaForm = document.getElementById("lista-form");
   const listaTabela = document.getElementById("lista-tabela");
 
@@ -13,16 +11,12 @@ document.addEventListener("DOMContentLoaded", function () {
   const campoMensagem = document.getElementById("lista-mensagem");
   const modalElement = document.getElementById("modalAdicionarItemLista");
 
-  // Cria uma instância do modal do Bootstrap
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
 
-  // Carrega o estoque salvo no navegador
   let itensEstoque = carregarEstoque();
 
-  // Renderiza a tabela ao abrir a página
   renderizarTabela();
 
-  // Observa mudanças no campo de unidade
   campoUnidade.addEventListener("change", function () {
     if (campoUnidade.value === "outro(s)") {
       campoUnidadeOutraWrapper.classList.remove("d-none");
@@ -34,7 +28,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Limpa o modal ao fechar
   modalElement.addEventListener("hidden.bs.modal", function () {
     listaForm.reset();
     campoUnidade.value = "unidade(s)";
@@ -44,7 +37,6 @@ document.addEventListener("DOMContentLoaded", function () {
     campoMensagem.textContent = "";
   });
 
-  // Escuta o envio do formulário
   listaForm.addEventListener("submit", function (event) {
     event.preventDefault();
 
@@ -62,7 +54,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    // Verifica duplicidade por nome + unidade
     const indiceExistente = itensEstoque.findIndex(function (item) {
       return (
         item.nome.trim().toLowerCase() === nome.trim().toLowerCase() &&
@@ -75,12 +66,11 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    // Cria item novo no estoque com quantidade 0 e localização vazia
     const novoItem = {
       nome: nome,
       unidade: unidade,
       quantidade: 0,
-      localizacao: ""
+      categoria: ""
     };
 
     itensEstoque.push(novoItem);
@@ -122,15 +112,12 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    // Ordena:
-    // 1. quantidade 0 primeiro
-    // 2. depois ordem alfabética
     const itensOrdenados = [...itensEstoque].sort(function (a, b) {
-      if (a.quantidade === 0 && b.quantidade !== 0) {
+      if (Number(a.quantidade) === 0 && Number(b.quantidade) !== 0) {
         return -1;
       }
 
-      if (a.quantidade !== 0 && b.quantidade === 0) {
+      if (Number(a.quantidade) !== 0 && Number(b.quantidade) === 0) {
         return 1;
       }
 
@@ -140,11 +127,11 @@ document.addEventListener("DOMContentLoaded", function () {
     itensOrdenados.forEach(function (item) {
       const novaLinha = document.createElement("tr");
 
-      if (item.quantidade === 0) {
+      if (Number(item.quantidade) === 0) {
         novaLinha.classList.add("status-danger");
       }
 
-      if (!item.localizacao || item.localizacao.trim() === "") {
+      if (!item.categoria || item.categoria.trim() === "") {
         novaLinha.classList.add("status-location-empty");
       }
 
@@ -154,8 +141,8 @@ document.addEventListener("DOMContentLoaded", function () {
         </td>
         <td>${item.nome}</td>
         <td>${item.unidade}</td>
-        <td>${formatarNumero(item.quantidade)}</td>
-        <td>${item.localizacao || ""}</td>
+        <td>${formatarNumero(Number(item.quantidade) || 0)}</td>
+        <td>${item.categoria || ""}</td>
       `;
 
       listaTabela.appendChild(novaLinha);
@@ -163,6 +150,9 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function formatarNumero(valor) {
-    return valor.toLocaleString("pt-BR");
+    return Number(valor).toLocaleString("pt-BR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
   }
 });
