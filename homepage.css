@@ -2,6 +2,12 @@
 body {
   min-height: 100vh;
   background-color: #f8f9fa;
+  overflow-x: hidden;
+}
+
+/* Classe usada quando o menu mobile estiver aberto */
+body.menu-mobile-open {
+  overflow: hidden;
 }
 
 /* Cria o visual das caixas de conteúdo:
@@ -49,7 +55,7 @@ a.text-reset:hover .app-box {
 }
 
 /* Estrutura fixa do menu lateral esquerdo.
-   Agora a largura do container fica limitada à faixa sensível. */
+   No desktop, a largura fica restrita à faixa sensível. */
 .site-map-left {
   position: fixed;
   top: 0;
@@ -72,7 +78,9 @@ a.text-reset:hover .app-box {
   top: 0;
   left: 0;
   width: 220px;
+  max-width: 85vw;
   height: 100vh;
+  overflow-y: auto;
   background-color: #ffffff;
   border-right: 1px solid #dee2e6;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
@@ -84,5 +92,61 @@ a.text-reset:hover .app-box {
 @media (hover: hover) and (pointer: fine) {
   .site-map-left:hover .site-map-left-content {
     transform: translateX(0);
+  }
+}
+
+/* Estado de abertura controlado por classe.
+   Permite integração com botão hambúrguer via JavaScript. */
+.site-map-left.is-open .site-map-left-content,
+.site-map-left.menu-open .site-map-left-content,
+.site-map-left-content.is-open {
+  transform: translateX(0);
+}
+
+/* Fundo escurecido para menu mobile */
+.menu-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 1039;
+}
+
+/* Ajustes para mobile */
+@media (max-width: 991.98px) {
+  .site-map-left {
+    width: 0;
+    overflow: visible;
+  }
+
+  .site-map-left-hover-area {
+    display: none;
+  }
+
+  .site-map-left-content {
+    position: fixed;
+    width: 260px;
+    max-width: 85vw;
+    z-index: 1041;
+  }
+
+  .app-box {
+    padding: 18px;
+  }
+
+  .home-card {
+    min-height: auto;
+  }
+}
+
+/* Ajustes extras para telas muito pequenas */
+@media (max-width: 575.98px) {
+  .app-box {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .site-map-left-content {
+    width: 240px;
+    max-width: 88vw;
   }
 }
