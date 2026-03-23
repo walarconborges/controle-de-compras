@@ -3,12 +3,19 @@ document.addEventListener("DOMContentLoaded", function () {
   const CHAVE_ESTOQUE = "controleComprasEstoque";
   const CHAVE_HISTORICO_COMPRAS = "controleComprasHistoricoCompras";
   const CHAVE_MOVIMENTACOES_ESTOQUE = "controleComprasMovimentacoesEstoque";
+  const CHAVE_CATEGORIAS = "controleComprasCategorias";
 
   const compraForm = document.getElementById("compra-form");
   const compraTabela = document.getElementById("compra-tabela");
   const totalCompra = document.getElementById("total-compra");
+  const contadorItensCompra = document.getElementById("contador-itens-compra");
+  const templateLinhaCompra = document.getElementById("template-linha-compra");
+
   const campoItem = document.getElementById("compra-item");
   const sugestoesCompra = document.getElementById("sugestoes-compra");
+  const campoCategoria = document.getElementById("compra-categoria");
+  const campoNovaCategoriaWrapper = document.getElementById("campo-compra-nova-categoria-wrapper");
+  const campoNovaCategoria = document.getElementById("campo-compra-nova-categoria");
 
   const campoQuantidade = document.getElementById("compra-quantidade");
   const campoValorUnitario = document.getElementById("compra-valor-unitario");
@@ -21,6 +28,16 @@ document.addEventListener("DOMContentLoaded", function () {
   const modalElement = document.getElementById("modalAdicionarCompra");
   const btnFinalizarCompra = document.getElementById("btn-finalizar-compra");
 
+  const filtroItemCompra = document.getElementById("filtro-item-compra");
+  const filtroCategoriaCompra = document.getElementById("filtro-categoria-compra");
+  const ordenacaoCompra = document.getElementById("ordenacao-compra");
+  const resumoFiltrosCompra = document.getElementById("resumo-filtros-compra");
+  const btnLimparFiltrosCompra = document.getElementById("btn-limpar-filtros-compra");
+
+  const ordenarColunaItem = document.getElementById("ordenar-coluna-item-compra");
+  const ordenarColunaQuantidade = document.getElementById("ordenar-coluna-quantidade-compra");
+  const ordenarColunaCategoria = document.getElementById("ordenar-coluna-categoria-compra");
+
   const modalItemRepetidoElement = document.getElementById("modalItemRepetidoCompra");
   const btnCancelarItemRepetido = document.getElementById("btn-cancelar-item-repetido-compra");
   const btnEditarItemRepetido = document.getElementById("btn-editar-item-repetido-compra");
@@ -29,12 +46,24 @@ document.addEventListener("DOMContentLoaded", function () {
   const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
   const modalItemRepetidoBootstrap = bootstrap.Modal.getOrCreateInstance(modalItemRepetidoElement);
 
-  let itensCompra = carregarCompra();
+  let itensCompra = carregarCompraNormalizada();
   let indiceEdicao = null;
   let itemPendente = null;
   let indiceItemRepetido = null;
-  let categoriaSelecionadaDoEstoque = "";
 
+  let filtrosAtivos = {
+    item: "",
+    categoria: ""
+  };
+
+  let estadoOrdenacao = {
+    campo: "item",
+    direcao: "asc"
+  };
+
+  sincronizarOrdenacaoComSelect();
+
+  popularCategoriasDinamicas();
   renderizarTabela();
 
   modalElement.addEventListener("hidden.bs.modal", function () {
@@ -49,6 +78,10 @@ document.addEventListener("DOMContentLoaded", function () {
     alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
   });
 
+  campoCategoria.addEventListener("change", function () {
+    alternarCampoCategoriaNova();
+  });
+
   campoItem.addEventListener("input", function () {
     atualizarCategoriaPeloNomeDigitado();
     renderizarSugestoesDoEstoque();
@@ -60,6 +93,33 @@ document.addEventListener("DOMContentLoaded", function () {
     }, 150);
   });
 
+  filtroItemCompra.addEventListener("input", function () {
+    filtrosAtivos.item = filtroItemCompra.value.trim();
+    renderizarTabela();
+  });
+
+  filtroCategoriaCompra.addEventListener("change", function () {
+    filtrosAtivos.categoria = filtroCategoriaCompra.value;
+    renderizarTabela();
+  });
+
+  ordenacaoCompra.addEventListener("change", function () {
+    sincronizarOrdenacaoPeloSelect();
+    renderizarTabela();
+  });
+
+  btnLimparFiltrosCompra.addEventListener("click", function () {
+    filtrosAtivos.item = "";
+    filtrosAtivos.categoria = "";
+    filtroItemCompra.value = "";
+    filtroCategoriaCompra.value = "";
+    renderizarTabela();
+  });
+
+  configurarOrdenacaoPorCabecalho(ordenarColunaItem, "item");
+  configurarOrdenacaoPorCabecalho(ordenarColunaQuantidade, "quantidade");
+  configurarOrdenacaoPorCabecalho(ordenarColunaCategoria, "categoria");
+
   compraForm.addEventListener("submit", function (event) {
     event.preventDefault();
     campoMensagem.textContent = "";
@@ -67,13 +127,24 @@ document.addEventListener("DOMContentLoaded", function () {
     const nome = campoItem.value.trim();
     const quantidade = normalizarNumero(campoQuantidade.value);
     const valorUnitario = normalizarNumero(campoValorUnitario.value);
-    let unidade = campoUnidade.value;
 
+    let unidade = campoUnidade.value;
     if (unidade === "outro(s)") {
       unidade = campoUnidadeOutra.value.trim();
     }
 
-    if (!nome || !unidade || Number.isNaN(quantidade) || Number.isNaN(valorUnitario)) {
+    let categoria = campoCategoria.value;
+    if (categoria === "__nova__") {
+      categoria = campoNovaCategoria.value.trim();
+    }
+
+    if (
+      !nome ||
+      !unidade ||
+      !categoria ||
+      Number.isNaN(quantidade) ||
+      Number.isNaN(valorUnitario)
+    ) {
       campoMensagem.textContent = "Preencha todos os campos corretamente.";
       return;
     }
@@ -83,16 +154,14 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const itemCorrespondenteNoEstoque = buscarItemNoEstoquePorNome(nome);
+    categoria = normalizarNomeCategoria(categoria);
 
     const novoItem = {
       nome: nome,
       quantidade: quantidade,
       unidade: unidade,
       valorUnitario: valorUnitario,
-      categoria: itemCorrespondenteNoEstoque
-        ? itemCorrespondenteNoEstoque.categoria || ""
-        : categoriaSelecionadaDoEstoque || ""
+      categoria: categoria
     };
 
     const indiceExistente = itensCompra.findIndex(function (itemExistente, indice) {
@@ -115,9 +184,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       itensCompra[indiceEdicao] = novoItem;
-      indiceEdicao = null;
+      persistirCategoriasDoItem(novoItem);
       salvarCompra();
+      popularCategoriasDinamicas();
       renderizarTabela();
+      indiceEdicao = null;
       limparFormularioFecharModal();
       return;
     }
@@ -130,7 +201,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     itensCompra.push(novoItem);
+    persistirCategoriasDoItem(novoItem);
     salvarCompra();
+    popularCategoriasDinamicas();
     renderizarTabela();
     limparFormularioFecharModal();
   });
@@ -148,7 +221,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     itensCompra[indiceItemRepetido] = itemPendente;
+    persistirCategoriasDoItem(itemPendente);
     salvarCompra();
+    popularCategoriasDinamicas();
     renderizarTabela();
 
     itemPendente = null;
@@ -181,7 +256,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const estoqueAtual = carregarEstoque();
+    const estoqueAtual = carregarEstoqueNormalizado();
     const movimentacoesEstoque = carregarMovimentacoesEstoque();
 
     itensCompra.forEach(function (itemCompra) {
@@ -198,10 +273,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const quantidadeNova = quantidadeAnterior + Number(itemCompra.quantidade);
 
         itemEstoque.quantidade = quantidadeNova;
-
-        if (!itemEstoque.categoria && itemCompra.categoria) {
-          itemEstoque.categoria = itemCompra.categoria;
-        }
+        itemEstoque.categoria = normalizarNomeCategoria(itemCompra.categoria || itemEstoque.categoria || "");
 
         movimentacoesEstoque.push(
           criarMovimentacaoEstoque(
@@ -220,7 +292,7 @@ document.addEventListener("DOMContentLoaded", function () {
           nome: itemCompra.nome,
           unidade: itemCompra.unidade,
           quantidade: Number(itemCompra.quantidade),
-          categoria: itemCompra.categoria || ""
+          categoria: normalizarNomeCategoria(itemCompra.categoria || "")
         };
 
         estoqueAtual.push(novoItemEstoque);
@@ -238,6 +310,8 @@ document.addEventListener("DOMContentLoaded", function () {
           )
         );
       }
+
+      persistirCategoriasDoItem(itemCompra);
     });
 
     salvarEstoque(estoqueAtual);
@@ -260,7 +334,7 @@ document.addEventListener("DOMContentLoaded", function () {
           unidade: item.unidade,
           valorUnitario: Number(item.valorUnitario),
           subtotal: Number(item.quantidade) * Number(item.valorUnitario),
-          categoria: item.categoria || ""
+          categoria: normalizarNomeCategoria(item.categoria || "")
         };
       })
     };
@@ -270,6 +344,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     itensCompra = [];
     salvarCompra();
+    popularCategoriasDinamicas();
     renderizarTabela();
     campoMensagem.textContent = "Compra finalizada e estoque atualizado.";
   });
@@ -290,6 +365,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  function carregarEstoqueNormalizado() {
+    return carregarEstoque().map(function (item) {
+      return {
+        nome: String(item.nome || "").trim(),
+        unidade: String(item.unidade || "").trim(),
+        quantidade: Number(item.quantidade) || 0,
+        categoria: normalizarNomeCategoria(item.categoria || "")
+      };
+    });
+  }
+
   function salvarEstoque(estoque) {
     localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(estoque));
   }
@@ -308,6 +394,18 @@ document.addEventListener("DOMContentLoaded", function () {
       console.error("Erro ao carregar compra:", erro);
       return [];
     }
+  }
+
+  function carregarCompraNormalizada() {
+    return carregarCompra().map(function (item) {
+      return {
+        nome: String(item.nome || "").trim(),
+        quantidade: Number(item.quantidade) || 0,
+        unidade: String(item.unidade || "").trim(),
+        valorUnitario: Number(item.valorUnitario) || 0,
+        categoria: normalizarNomeCategoria(item.categoria || "")
+      };
+    });
   }
 
   function carregarHistoricoCompras() {
@@ -363,7 +461,7 @@ document.addEventListener("DOMContentLoaded", function () {
       tipo: tipo,
       nome: item.nome,
       unidade: item.unidade,
-      categoria: item.categoria || "",
+      categoria: normalizarNomeCategoria(item.categoria || ""),
       quantidadeAnterior: anterior,
       quantidadeNova: nova,
       variacao: nova - anterior,
@@ -371,79 +469,454 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-  function renderizarTabela() {
-    compraTabela.innerHTML = "";
+  function carregarCategoriasSalvas() {
+    const dadosSalvos = localStorage.getItem(CHAVE_CATEGORIAS);
 
-    if (itensCompra.length === 0) {
-      compraTabela.innerHTML = `
-        <tr>
-          <td colspan="6" class="text-center text-muted">
-            Nenhuma compra registrada até o momento.
-          </td>
-        </tr>
-      `;
-      totalCompra.textContent = "0,00";
+    if (!dadosSalvos) {
+      return [];
+    }
+
+    try {
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+      console.error("Erro ao carregar categorias:", erro);
+      return [];
+    }
+  }
+
+  function salvarCategorias(categorias) {
+    localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(categorias));
+  }
+
+  function persistirCategoriasDoItem(item) {
+    const categoria = normalizarNomeCategoria(item && item.categoria ? item.categoria : "");
+
+    if (!categoria) {
       return;
     }
 
-    let totalAcumulado = 0;
+    const categoriasAtuais = carregarCategoriasSalvas();
+    const existe = categoriasAtuais.some(function (categoriaAtual) {
+      return normalizarTexto(categoriaAtual) === normalizarTexto(categoria);
+    });
 
-    itensCompra.forEach(function (item, indice) {
-      const subtotal = Number(item.quantidade) * Number(item.valorUnitario);
-      totalAcumulado += subtotal;
+    if (!existe) {
+      categoriasAtuais.push(categoria);
+      categoriasAtuais.sort(function (a, b) {
+        return a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+      });
+      salvarCategorias(categoriasAtuais);
+    }
+  }
 
-      const novaLinha = document.createElement("tr");
-      novaLinha.innerHTML = `
-        <td>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-warning btn-editar" data-indice="${indice}">
-              Editar
-            </button>
-            <button type="button" class="btn btn-sm btn-danger btn-remover" data-indice="${indice}">
-              Remover
-            </button>
+  function obterCategoriasDinamicas() {
+    const categoriasSet = new Set();
+
+    carregarCategoriasSalvas().forEach(function (categoria) {
+      const valor = normalizarNomeCategoria(categoria);
+      if (valor) {
+        categoriasSet.add(valor);
+      }
+    });
+
+    carregarEstoque().forEach(function (item) {
+      const valor = normalizarNomeCategoria(item.categoria || "");
+      if (valor) {
+        categoriasSet.add(valor);
+      }
+    });
+
+    itensCompra.forEach(function (item) {
+      const valor = normalizarNomeCategoria(item.categoria || "");
+      if (valor) {
+        categoriasSet.add(valor);
+      }
+    });
+
+    return Array.from(categoriasSet).sort(function (a, b) {
+      return a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    });
+  }
+
+  function popularCategoriasDinamicas() {
+    const categorias = obterCategoriasDinamicas();
+    const valorAtualCategoria = campoCategoria ? campoCategoria.value : "";
+    const valorAtualFiltro = filtroCategoriaCompra ? filtroCategoriaCompra.value : "";
+
+    if (campoCategoria) {
+      campoCategoria.innerHTML = "";
+      campoCategoria.appendChild(criarOption("", "Selecione a categoria"));
+      categorias.forEach(function (categoria) {
+        campoCategoria.appendChild(criarOption(categoria, categoria));
+      });
+      campoCategoria.appendChild(criarOption("__nova__", "Nova categoria"));
+
+      if (valorAtualCategoria && Array.from(campoCategoria.options).some(function (option) { return option.value === valorAtualCategoria; })) {
+        campoCategoria.value = valorAtualCategoria;
+      } else {
+        campoCategoria.value = "";
+      }
+
+      alternarCampoCategoriaNova();
+    }
+
+    if (filtroCategoriaCompra) {
+      filtroCategoriaCompra.innerHTML = "";
+      filtroCategoriaCompra.appendChild(criarOption("", "Todas as categorias"));
+      categorias.forEach(function (categoria) {
+        filtroCategoriaCompra.appendChild(criarOption(categoria, categoria));
+      });
+
+      if (valorAtualFiltro && Array.from(filtroCategoriaCompra.options).some(function (option) { return option.value === valorAtualFiltro; })) {
+        filtroCategoriaCompra.value = valorAtualFiltro;
+      } else {
+        filtroCategoriaCompra.value = "";
+        filtrosAtivos.categoria = "";
+      }
+    }
+  }
+
+  function criarOption(valor, texto) {
+    const option = document.createElement("option");
+    option.value = valor;
+    option.textContent = texto;
+    return option;
+  }
+
+  function alternarCampoCategoriaNova() {
+    if (!campoCategoria || !campoNovaCategoriaWrapper || !campoNovaCategoria) {
+      return;
+    }
+
+    if (campoCategoria.value === "__nova__") {
+      campoNovaCategoriaWrapper.classList.remove("d-none");
+      campoNovaCategoria.required = true;
+    } else {
+      campoNovaCategoriaWrapper.classList.add("d-none");
+      campoNovaCategoria.required = false;
+      campoNovaCategoria.value = "";
+    }
+  }
+
+  function renderizarTabela() {
+    compraTabela.innerHTML = "";
+
+    const itensFiltrados = aplicarFiltros(itensCompra);
+    const itensOrdenados = aplicarOrdenacao(itensFiltrados);
+
+    atualizarResumoFiltros();
+    atualizarIndicadoresOrdenacao();
+    atualizarContadorItens(itensOrdenados.length);
+
+    if (itensOrdenados.length === 0) {
+      const haItensCadastrados = itensCompra.length > 0;
+      compraTabela.innerHTML = `
+        <tr id="compra-estado-vazio">
+          <td colspan="7" class="text-center text-muted empty-state">
+            ${haItensCadastrados ? "Nenhum item corresponde aos filtros aplicados." : "Nenhuma compra registrada até o momento."}
+          </td>
+        </tr>
+      `;
+      atualizarTotalCompra();
+      return;
+    }
+
+    itensOrdenados.forEach(function (item) {
+      const linha = criarLinhaTabela(item);
+      compraTabela.appendChild(linha);
+    });
+
+    atualizarTotalCompra();
+  }
+
+  function criarLinhaTabela(item) {
+    const subtotal = Number(item.quantidade) * Number(item.valorUnitario);
+    const indiceReal = encontrarIndiceRealDoItem(item);
+
+    if (!templateLinhaCompra) {
+      const linhaFallback = document.createElement("tr");
+      linhaFallback.innerHTML = `
+        <td class="cell-acoes">
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-primary btn-sm btn-editar-compra">Editar</button>
+            <button type="button" class="btn btn-outline-danger btn-sm btn-excluir-compra">Excluir</button>
           </div>
         </td>
-        <td>${escaparHtml(item.nome)}</td>
-        <td>${formatarNumero(item.quantidade)}</td>
-        <td>${escaparHtml(item.unidade)}</td>
-        <td>R$ ${formatarMoeda(item.valorUnitario)}</td>
-        <td>R$ ${formatarMoeda(subtotal)}</td>
+        <td class="item-nome"></td>
+        <td class="item-quantidade cell-quantidade"></td>
+        <td class="item-unidade"></td>
+        <td class="item-categoria"></td>
+        <td class="item-valor-unitario"></td>
+        <td class="item-subtotal"></td>
       `;
+      preencherLinhaTabela(linhaFallback, item, subtotal, indiceReal);
+      return linhaFallback;
+    }
 
-      compraTabela.appendChild(novaLinha);
+    const fragmento = templateLinhaCompra.content.cloneNode(true);
+    const linha = fragmento.querySelector("tr");
+    preencherLinhaTabela(linha, item, subtotal, indiceReal);
+    return linha;
+  }
 
-      const botaoEditar = novaLinha.querySelector(".btn-editar");
-      const botaoRemover = novaLinha.querySelector(".btn-remover");
+  function preencherLinhaTabela(linha, item, subtotal, indiceReal) {
+    linha.dataset.item = normalizarTexto(item.nome);
+    linha.dataset.categoria = normalizarTexto(item.categoria);
+    linha.dataset.quantidade = String(Number(item.quantidade) || 0);
+    linha.dataset.unidade = normalizarTexto(item.unidade);
+    linha.dataset.valorUnitario = String(Number(item.valorUnitario) || 0);
+    linha.dataset.subtotal = String(subtotal);
 
+    const celulaNome = linha.querySelector(".item-nome");
+    const celulaQuantidade = linha.querySelector(".item-quantidade");
+    const celulaUnidade = linha.querySelector(".item-unidade");
+    const celulaCategoria = linha.querySelector(".item-categoria");
+    const celulaValorUnitario = linha.querySelector(".item-valor-unitario");
+    const celulaSubtotal = linha.querySelector(".item-subtotal");
+
+    if (celulaNome) {
+      celulaNome.textContent = item.nome;
+    }
+
+    if (celulaQuantidade) {
+      celulaQuantidade.textContent = formatarNumero(item.quantidade);
+    }
+
+    if (celulaUnidade) {
+      celulaUnidade.textContent = item.unidade;
+    }
+
+    if (celulaCategoria) {
+      celulaCategoria.innerHTML = item.categoria
+        ? `<span class="badge-categoria">${escaparHtml(item.categoria)}</span>`
+        : "—";
+    }
+
+    if (celulaValorUnitario) {
+      celulaValorUnitario.textContent = "R$ " + formatarMoeda(item.valorUnitario);
+    }
+
+    if (celulaSubtotal) {
+      celulaSubtotal.textContent = "R$ " + formatarMoeda(subtotal);
+    }
+
+    const botaoEditar = linha.querySelector(".btn-editar-compra");
+    const botaoExcluir = linha.querySelector(".btn-excluir-compra");
+
+    if (botaoEditar) {
       botaoEditar.addEventListener("click", function () {
-        preencherFormulario(itensCompra[indice]);
-        indiceEdicao = indice;
+        if (indiceReal < 0) {
+          return;
+        }
+
+        preencherFormulario(itensCompra[indiceReal]);
+        indiceEdicao = indiceReal;
         campoMensagem.textContent = "";
         modalBootstrap.show();
       });
+    }
 
-      botaoRemover.addEventListener("click", function () {
+    if (botaoExcluir) {
+      botaoExcluir.addEventListener("click", function () {
+        if (indiceReal < 0) {
+          return;
+        }
+
         const desejaRemover = confirm("Deseja remover este item da compra?");
-
         if (!desejaRemover) {
           return;
         }
 
-        itensCompra.splice(indice, 1);
+        itensCompra.splice(indiceReal, 1);
         salvarCompra();
+        popularCategoriasDinamicas();
         renderizarTabela();
       });
+    }
+  }
+
+  function aplicarFiltros(lista) {
+    return lista.filter(function (item) {
+      const correspondeItem =
+        !filtrosAtivos.item ||
+        normalizarTexto(item.nome).includes(normalizarTexto(filtrosAtivos.item));
+
+      const correspondeCategoria =
+        !filtrosAtivos.categoria ||
+        normalizarTexto(item.categoria) === normalizarTexto(filtrosAtivos.categoria);
+
+      return correspondeItem && correspondeCategoria;
     });
+  }
+
+  function aplicarOrdenacao(lista) {
+    const listaOrdenada = lista.slice();
+
+    listaOrdenada.sort(function (a, b) {
+      let comparacao = 0;
+
+      if (estadoOrdenacao.campo === "item") {
+        comparacao = compararTexto(a.nome, b.nome);
+      } else if (estadoOrdenacao.campo === "categoria") {
+        comparacao = compararTexto(a.categoria, b.categoria);
+      } else if (estadoOrdenacao.campo === "quantidade") {
+        comparacao = compararNumero(a.quantidade, b.quantidade);
+      }
+
+      if (comparacao === 0) {
+        comparacao = compararTexto(a.nome, b.nome);
+      }
+
+      return estadoOrdenacao.direcao === "desc" ? comparacao * -1 : comparacao;
+    });
+
+    return listaOrdenada;
+  }
+
+  function compararTexto(a, b) {
+    return String(a || "").localeCompare(String(b || ""), "pt-BR", {
+      sensitivity: "base"
+    });
+  }
+
+  function compararNumero(a, b) {
+    return (Number(a) || 0) - (Number(b) || 0);
+  }
+
+  function sincronizarOrdenacaoPeloSelect() {
+    const valor = ordenacaoCompra.value || "item-asc";
+    const partes = valor.split("-");
+
+    estadoOrdenacao.campo = partes[0] || "item";
+    estadoOrdenacao.direcao = partes[1] || "asc";
+  }
+
+  function sincronizarOrdenacaoComSelect() {
+    if (!ordenacaoCompra) {
+      return;
+    }
+
+    ordenacaoCompra.value = `${estadoOrdenacao.campo}-${estadoOrdenacao.direcao}`;
+  }
+
+  function configurarOrdenacaoPorCabecalho(elemento, campo) {
+    if (!elemento) {
+      return;
+    }
+
+    function alternarOrdenacao() {
+      if (estadoOrdenacao.campo === campo) {
+        estadoOrdenacao.direcao = estadoOrdenacao.direcao === "asc" ? "desc" : "asc";
+      } else {
+        estadoOrdenacao.campo = campo;
+        estadoOrdenacao.direcao = "asc";
+      }
+
+      sincronizarOrdenacaoComSelect();
+      renderizarTabela();
+    }
+
+    elemento.addEventListener("click", alternarOrdenacao);
+
+    elemento.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        alternarOrdenacao();
+      }
+    });
+  }
+
+  function atualizarIndicadoresOrdenacao() {
+    const cabecalhos = [
+      { elemento: ordenarColunaItem, campo: "item" },
+      { elemento: ordenarColunaQuantidade, campo: "quantidade" },
+      { elemento: ordenarColunaCategoria, campo: "categoria" }
+    ];
+
+    cabecalhos.forEach(function (cabecalho) {
+      if (!cabecalho.elemento) {
+        return;
+      }
+
+      const indicador = cabecalho.elemento.querySelector(".sort-indicator");
+      const ativo = estadoOrdenacao.campo === cabecalho.campo;
+
+      cabecalho.elemento.setAttribute("aria-sort", ativo ? (estadoOrdenacao.direcao === "asc" ? "ascending" : "descending") : "none");
+
+      if (indicador) {
+        indicador.textContent = !ativo ? "↕" : estadoOrdenacao.direcao === "asc" ? "↑" : "↓";
+      }
+    });
+  }
+
+  function atualizarResumoFiltros() {
+    if (!resumoFiltrosCompra) {
+      return;
+    }
+
+    resumoFiltrosCompra.innerHTML = "";
+
+    if (filtrosAtivos.item) {
+      resumoFiltrosCompra.appendChild(
+        criarChipFiltro("Item: " + filtrosAtivos.item, function () {
+          filtrosAtivos.item = "";
+          filtroItemCompra.value = "";
+          renderizarTabela();
+        })
+      );
+    }
+
+    if (filtrosAtivos.categoria) {
+      resumoFiltrosCompra.appendChild(
+        criarChipFiltro("Categoria: " + filtrosAtivos.categoria, function () {
+          filtrosAtivos.categoria = "";
+          filtroCategoriaCompra.value = "";
+          renderizarTabela();
+        })
+      );
+    }
+  }
+
+  function criarChipFiltro(texto, aoRemover) {
+    const chip = document.createElement("span");
+    chip.className = "filter-chip";
+
+    const textoChip = document.createElement("span");
+    textoChip.textContent = texto;
+
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.setAttribute("aria-label", "Remover filtro");
+    botao.innerHTML = "&times;";
+    botao.addEventListener("click", aoRemover);
+
+    chip.appendChild(textoChip);
+    chip.appendChild(botao);
+
+    return chip;
+  }
+
+  function atualizarContadorItens(quantidadeExibida) {
+    if (!contadorItensCompra) {
+      return;
+    }
+
+    contadorItensCompra.textContent = `${quantidadeExibida} item(ns) exibido(s)`;
+  }
+
+  function atualizarTotalCompra() {
+    const totalAcumulado = itensCompra.reduce(function (total, item) {
+      return total + Number(item.quantidade) * Number(item.valorUnitario);
+    }, 0);
 
     totalCompra.textContent = formatarMoeda(totalAcumulado);
   }
 
   function preencherFormulario(item) {
     campoItem.value = item.nome;
-    campoQuantidade.value = item.quantidade;
-    campoValorUnitario.value = item.valorUnitario;
-    categoriaSelecionadaDoEstoque = item.categoria || "";
+    campoQuantidade.value = formatarValorCampo(item.quantidade);
+    campoValorUnitario.value = formatarValorCampo(item.valorUnitario);
 
     preencherSelectOuOutro(
       campoUnidade,
@@ -451,19 +924,44 @@ document.addEventListener("DOMContentLoaded", function () {
       campoUnidadeOutra,
       item.unidade
     );
+
+    preencherCampoCategoria(item.categoria || "");
+    renderizarSugestoesDoEstoque();
+  }
+
+  function preencherCampoCategoria(categoria) {
+    const categoriaNormalizada = normalizarNomeCategoria(categoria);
+
+    if (!categoriaNormalizada) {
+      campoCategoria.value = "";
+      alternarCampoCategoriaNova();
+      return;
+    }
+
+    const existeNaLista = Array.from(campoCategoria.options).some(function (option) {
+      return normalizarTexto(option.value) === normalizarTexto(categoriaNormalizada);
+    });
+
+    if (existeNaLista) {
+      campoCategoria.value = categoriaNormalizada;
+      campoNovaCategoria.value = "";
+    } else {
+      campoCategoria.value = "__nova__";
+      campoNovaCategoria.value = categoriaNormalizada;
+    }
+
+    alternarCampoCategoriaNova();
   }
 
   function renderizarSugestoesDoEstoque() {
     const termoDigitado = normalizarTexto(campoItem.value);
-
     limparSugestoes();
 
     if (!termoDigitado) {
-      categoriaSelecionadaDoEstoque = "";
       return;
     }
 
-    const estoqueAtual = carregarEstoque();
+    const estoqueAtual = carregarEstoqueNormalizado();
 
     const sugestoes = estoqueAtual
       .filter(function (item) {
@@ -483,7 +981,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       botaoSugestao.addEventListener("click", function () {
         campoItem.value = item.nome;
-        categoriaSelecionadaDoEstoque = item.categoria || "";
 
         preencherSelectOuOutro(
           campoUnidade,
@@ -492,6 +989,7 @@ document.addEventListener("DOMContentLoaded", function () {
           item.unidade || ""
         );
 
+        preencherCampoCategoria(item.categoria || "");
         limparSugestoes();
       });
 
@@ -547,7 +1045,12 @@ document.addEventListener("DOMContentLoaded", function () {
     campoUnidadeOutraWrapper.classList.add("d-none");
     campoUnidadeOutra.required = false;
     campoUnidadeOutra.value = "";
-    categoriaSelecionadaDoEstoque = "";
+
+    campoCategoria.value = "";
+    campoNovaCategoriaWrapper.classList.add("d-none");
+    campoNovaCategoria.required = false;
+    campoNovaCategoria.value = "";
+
     limparSugestoes();
   }
 
@@ -560,12 +1063,18 @@ document.addEventListener("DOMContentLoaded", function () {
     const nome = campoItem.value.trim();
 
     if (!nome) {
-      categoriaSelecionadaDoEstoque = "";
+      if (indiceEdicao === null) {
+        campoCategoria.value = "";
+        alternarCampoCategoriaNova();
+      }
       return;
     }
 
     const itemCorrespondente = buscarItemNoEstoquePorNome(nome);
-    categoriaSelecionadaDoEstoque = itemCorrespondente ? itemCorrespondente.categoria || "" : "";
+
+    if (itemCorrespondente && itemCorrespondente.categoria) {
+      preencherCampoCategoria(itemCorrespondente.categoria);
+    }
   }
 
   function buscarItemNoEstoquePorNome(nome) {
@@ -575,7 +1084,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return null;
     }
 
-    const estoqueAtual = carregarEstoque();
+    const estoqueAtual = carregarEstoqueNormalizado();
 
     return (
       estoqueAtual.find(function (item) {
@@ -584,13 +1093,38 @@ document.addEventListener("DOMContentLoaded", function () {
     );
   }
 
+  function encontrarIndiceRealDoItem(itemOrdenado) {
+    return itensCompra.findIndex(function (itemOriginal) {
+      return (
+        normalizarTexto(itemOriginal.nome) === normalizarTexto(itemOrdenado.nome) &&
+        normalizarTexto(itemOriginal.unidade) === normalizarTexto(itemOrdenado.unidade) &&
+        normalizarTexto(itemOriginal.categoria) === normalizarTexto(itemOrdenado.categoria) &&
+        Number(itemOriginal.quantidade) === Number(itemOrdenado.quantidade) &&
+        Number(itemOriginal.valorUnitario) === Number(itemOrdenado.valorUnitario)
+      );
+    });
+  }
+
   function normalizarNumero(valor) {
-    const texto = String(valor || "").trim().replace(/\s+/g, "").replace(",", ".");
+    const texto = String(valor || "")
+      .trim()
+      .replace(/\s+/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+
     return parseFloat(texto);
   }
 
   function normalizarTexto(valor) {
-    return String(valor || "").trim().toLowerCase();
+    return String(valor || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function normalizarNomeCategoria(valor) {
+    return String(valor || "").trim().replace(/\s+/g, " ");
   }
 
   function formatarNumero(valor) {
@@ -605,6 +1139,16 @@ document.addEventListener("DOMContentLoaded", function () {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  }
+
+  function formatarValorCampo(valor) {
+    const numero = Number(valor);
+
+    if (Number.isInteger(numero)) {
+      return String(numero);
+    }
+
+    return String(numero).replace(".", ",");
   }
 
   function escaparHtml(valor) {
