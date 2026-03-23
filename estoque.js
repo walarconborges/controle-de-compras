@@ -1,359 +1,1030 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Estoque | Controle de Compras</title>
+document.addEventListener("DOMContentLoaded", function () {
+  const CHAVE_ESTOQUE = "controleComprasEstoque";
+  const CHAVE_MOVIMENTACOES_ESTOQUE = "controleComprasMovimentacoesEstoque";
+  const CHAVE_CATEGORIAS = "controleComprasCategorias";
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="estoque.css">
-</head>
-<body>
-  <header>
-    <nav class="site-map-top">
-      <div class="container py-2">
-        <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm d-lg-none"
-            id="btn-menu-mobile"
-            aria-label="Abrir menu de navegação"
-            aria-controls="menu-lateral-estoque"
-            aria-expanded="false"
+  const estoqueForm = document.getElementById("estoque-form");
+  const estoqueTabela = document.getElementById("estoque-tabela");
+  const templateLinhaEstoque = document.getElementById("template-linha-estoque");
+  const contadorItensEstoque = document.getElementById("contador-itens-estoque");
+
+  const campoNome = document.getElementById("item-nome");
+  const campoQuantidadeCadastro = document.getElementById("item-quantidade");
+
+  const campoUnidade = document.getElementById("item-unidade");
+  const campoUnidadeOutraWrapper = document.getElementById("campo-unidade-outra-wrapper");
+  const campoUnidadeOutra = document.getElementById("campo-unidade-outra");
+
+  const campoCategoria = document.getElementById("item-categoria");
+  const campoCategoriaOutraWrapper = document.getElementById("campo-categoria-outra-wrapper");
+  const campoCategoriaOutra = document.getElementById("campo-categoria-outra");
+
+  const campoMensagem = document.getElementById("estoque-mensagem");
+  const modalElement = document.getElementById("modalAdicionarItem");
+
+  const filtroItemEstoque = document.getElementById("filtro-item-estoque");
+  const filtroCategoriaEstoque = document.getElementById("filtro-categoria-estoque");
+  const ordenacaoEstoque = document.getElementById("ordenacao-estoque");
+  const resumoFiltrosEstoque = document.getElementById("resumo-filtros-estoque");
+  const btnLimparFiltrosEstoque = document.getElementById("btn-limpar-filtros-estoque");
+
+  const ordenarColunaItem = document.getElementById("ordenar-coluna-item-estoque");
+  const ordenarColunaQuantidade = document.getElementById("ordenar-coluna-quantidade-estoque");
+  const ordenarColunaCategoria = document.getElementById("ordenar-coluna-categoria-estoque");
+
+  const modalItemRepetidoElement = document.getElementById("modalItemRepetido");
+  const btnCancelarItemRepetido = document.getElementById("btn-cancelar-item-repetido");
+  const btnEditarItemRepetido = document.getElementById("btn-editar-item-repetido");
+  const btnSubstituirItemRepetido = document.getElementById("btn-substituir-item-repetido");
+
+  const modalBootstrap = bootstrap.Modal.getOrCreateInstance(modalElement);
+  const modalItemRepetidoBootstrap = bootstrap.Modal.getOrCreateInstance(modalItemRepetidoElement);
+
+  let indiceEdicao = null;
+  let itemPendente = null;
+  let indiceItemRepetido = null;
+
+  let itensEstoque = carregarEstoqueNormalizado();
+
+  let filtrosAtivos = {
+    item: "",
+    categoria: ""
+  };
+
+  let estadoOrdenacao = {
+    campo: "item",
+    direcao: "asc"
+  };
+
+  sincronizarOrdenacaoComSelect();
+  popularCategoriasDinamicas();
+  renderizarTabela();
+
+  modalElement.addEventListener("hidden.bs.modal", function () {
+    limparFormulario();
+    campoMensagem.textContent = "";
+    indiceEdicao = null;
+    itemPendente = null;
+    indiceItemRepetido = null;
+  });
+
+  campoUnidade.addEventListener("change", function () {
+    alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
+  });
+
+  campoCategoria.addEventListener("change", function () {
+    alternarCampoCategoriaNova();
+  });
+
+  if (filtroItemEstoque) {
+    filtroItemEstoque.addEventListener("input", function () {
+      filtrosAtivos.item = filtroItemEstoque.value.trim();
+      renderizarTabela();
+    });
+  }
+
+  if (filtroCategoriaEstoque) {
+    filtroCategoriaEstoque.addEventListener("change", function () {
+      filtrosAtivos.categoria = filtroCategoriaEstoque.value;
+      renderizarTabela();
+    });
+  }
+
+  if (ordenacaoEstoque) {
+    ordenacaoEstoque.addEventListener("change", function () {
+      sincronizarOrdenacaoPeloSelect();
+      renderizarTabela();
+    });
+  }
+
+  if (btnLimparFiltrosEstoque) {
+    btnLimparFiltrosEstoque.addEventListener("click", function () {
+      filtrosAtivos.item = "";
+      filtrosAtivos.categoria = "";
+
+      if (filtroItemEstoque) {
+        filtroItemEstoque.value = "";
+      }
+
+      if (filtroCategoriaEstoque) {
+        filtroCategoriaEstoque.value = "";
+      }
+
+      renderizarTabela();
+    });
+  }
+
+  configurarOrdenacaoPorCabecalho(ordenarColunaItem, "item");
+  configurarOrdenacaoPorCabecalho(ordenarColunaQuantidade, "quantidade");
+  configurarOrdenacaoPorCabecalho(ordenarColunaCategoria, "categoria");
+
+  estoqueForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    campoMensagem.textContent = "";
+
+    const nome = campoNome.value.trim();
+    const quantidade = normalizarNumero(campoQuantidadeCadastro.value);
+
+    let unidade = campoUnidade.value;
+    if (unidade === "outro(s)") {
+      unidade = campoUnidadeOutra.value.trim();
+    }
+
+    let categoria = campoCategoria.value;
+    if (categoria === "__nova__") {
+      categoria = campoCategoriaOutra.value.trim();
+    }
+
+    if (!nome || !unidade || Number.isNaN(quantidade)) {
+      campoMensagem.textContent = "Preencha todos os campos corretamente.";
+      return;
+    }
+
+    if (quantidade < 0) {
+      campoMensagem.textContent = "A quantidade não pode ser negativa.";
+      return;
+    }
+
+    categoria = normalizarNomeCategoria(categoria);
+
+    const novoItem = {
+      nome: nome,
+      unidade: unidade,
+      quantidade: quantidade,
+      categoria: categoria
+    };
+
+    if (indiceEdicao !== null) {
+      const itemAnterior = itensEstoque[indiceEdicao];
+      const quantidadeAnterior = Number(itemAnterior.quantidade) || 0;
+
+      const indiceDuplicado = itensEstoque.findIndex(function (item, indice) {
+        if (indice === indiceEdicao) {
+          return false;
+        }
+
+        return (
+          normalizarTexto(item.nome) === normalizarTexto(novoItem.nome) &&
+          normalizarTexto(item.unidade) === normalizarTexto(novoItem.unidade)
+        );
+      });
+
+      if (indiceDuplicado !== -1) {
+        itemPendente = novoItem;
+        indiceItemRepetido = indiceDuplicado;
+        modalItemRepetidoBootstrap.show();
+        return;
+      }
+
+      itensEstoque[indiceEdicao] = novoItem;
+      persistirCategoriasDoItem(novoItem);
+
+      if (
+        houveMudancaRelevante(itemAnterior, novoItem) ||
+        quantidadeAnterior !== Number(novoItem.quantidade)
+      ) {
+        registrarMovimentacaoEstoque("edicao", novoItem, quantidadeAnterior, novoItem.quantidade);
+      }
+
+      indiceEdicao = null;
+      salvarEstoque();
+      popularCategoriasDinamicas();
+      renderizarTabela();
+      limparFormulario();
+      modalBootstrap.hide();
+      return;
+    }
+
+    const indiceExistente = itensEstoque.findIndex(function (item) {
+      return (
+        normalizarTexto(item.nome) === normalizarTexto(novoItem.nome) &&
+        normalizarTexto(item.unidade) === normalizarTexto(novoItem.unidade)
+      );
+    });
+
+    if (indiceExistente !== -1) {
+      itemPendente = novoItem;
+      indiceItemRepetido = indiceExistente;
+      modalItemRepetidoBootstrap.show();
+      return;
+    }
+
+    itensEstoque.push(novoItem);
+    persistirCategoriasDoItem(novoItem);
+    registrarMovimentacaoEstoque("cadastro", novoItem, 0, novoItem.quantidade);
+
+    salvarEstoque();
+    popularCategoriasDinamicas();
+    renderizarTabela();
+
+    limparFormulario();
+    modalBootstrap.hide();
+  });
+
+  btnCancelarItemRepetido.addEventListener("click", function () {
+    itemPendente = null;
+    indiceItemRepetido = null;
+    campoMensagem.textContent = "Operação cancelada.";
+    modalItemRepetidoBootstrap.hide();
+  });
+
+  btnSubstituirItemRepetido.addEventListener("click", function () {
+    if (indiceItemRepetido === null || !itemPendente) {
+      return;
+    }
+
+    const quantidadeAnterior = Number(itensEstoque[indiceItemRepetido].quantidade) || 0;
+    itensEstoque[indiceItemRepetido] = itemPendente;
+
+    persistirCategoriasDoItem(itemPendente);
+    registrarMovimentacaoEstoque(
+      "substituicao",
+      itemPendente,
+      quantidadeAnterior,
+      itemPendente.quantidade
+    );
+
+    salvarEstoque();
+    popularCategoriasDinamicas();
+    renderizarTabela();
+
+    itemPendente = null;
+    indiceItemRepetido = null;
+    indiceEdicao = null;
+
+    modalItemRepetidoBootstrap.hide();
+    modalBootstrap.hide();
+    limparFormulario();
+  });
+
+  btnEditarItemRepetido.addEventListener("click", function () {
+    if (indiceItemRepetido === null) {
+      return;
+    }
+
+    preencherFormulario(itensEstoque[indiceItemRepetido]);
+    indiceEdicao = indiceItemRepetido;
+
+    itemPendente = null;
+    indiceItemRepetido = null;
+    modalItemRepetidoBootstrap.hide();
+    modalBootstrap.show();
+  });
+
+  function carregarEstoque() {
+    const dadosSalvos = localStorage.getItem(CHAVE_ESTOQUE);
+
+    if (!dadosSalvos) {
+      return [];
+    }
+
+    try {
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+      console.error("Erro ao carregar estoque:", erro);
+      return [];
+    }
+  }
+
+  function carregarEstoqueNormalizado() {
+    return carregarEstoque().map(function (item) {
+      return {
+        nome: String(item.nome || "").trim(),
+        unidade: String(item.unidade || "").trim(),
+        quantidade: Number(item.quantidade) || 0,
+        categoria: normalizarNomeCategoria(item.categoria || "")
+      };
+    });
+  }
+
+  function salvarEstoque() {
+    localStorage.setItem(CHAVE_ESTOQUE, JSON.stringify(itensEstoque));
+  }
+
+  function carregarMovimentacoesEstoque() {
+    const dadosSalvos = localStorage.getItem(CHAVE_MOVIMENTACOES_ESTOQUE);
+
+    if (!dadosSalvos) {
+      return [];
+    }
+
+    try {
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+      console.error("Erro ao carregar movimentações do estoque:", erro);
+      return [];
+    }
+  }
+
+  function salvarMovimentacoesEstoque(movimentacoes) {
+    localStorage.setItem(CHAVE_MOVIMENTACOES_ESTOQUE, JSON.stringify(movimentacoes));
+  }
+
+  function registrarMovimentacaoEstoque(tipo, item, quantidadeAnterior, quantidadeNova) {
+    const anterior = Number(quantidadeAnterior) || 0;
+    const nova = Number(quantidadeNova) || 0;
+    const variacao = nova - anterior;
+
+    const movimentacoes = carregarMovimentacoesEstoque();
+
+    movimentacoes.push({
+      data: new Date().toISOString(),
+      tipo: tipo,
+      nome: item.nome,
+      unidade: item.unidade,
+      categoria: normalizarNomeCategoria(item.categoria || ""),
+      quantidadeAnterior: anterior,
+      quantidadeNova: nova,
+      variacao: variacao,
+      saldoResultante: nova
+    });
+
+    salvarMovimentacoesEstoque(movimentacoes);
+  }
+
+  function carregarCategoriasSalvas() {
+    const dadosSalvos = localStorage.getItem(CHAVE_CATEGORIAS);
+
+    if (!dadosSalvos) {
+      return [];
+    }
+
+    try {
+      const dados = JSON.parse(dadosSalvos);
+      return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+      console.error("Erro ao carregar categorias:", erro);
+      return [];
+    }
+  }
+
+  function salvarCategorias(categorias) {
+    localStorage.setItem(CHAVE_CATEGORIAS, JSON.stringify(categorias));
+  }
+
+  function persistirCategoriasDoItem(item) {
+    const categoria = normalizarNomeCategoria(item && item.categoria ? item.categoria : "");
+
+    if (!categoria) {
+      return;
+    }
+
+    const categoriasAtuais = carregarCategoriasSalvas();
+    const existe = categoriasAtuais.some(function (categoriaAtual) {
+      return normalizarTexto(categoriaAtual) === normalizarTexto(categoria);
+    });
+
+    if (!existe) {
+      categoriasAtuais.push(categoria);
+      categoriasAtuais.sort(function (a, b) {
+        return a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+      });
+      salvarCategorias(categoriasAtuais);
+    }
+  }
+
+  function obterCategoriasDinamicas() {
+    const categoriasSet = new Set();
+
+    carregarCategoriasSalvas().forEach(function (categoria) {
+      const valor = normalizarNomeCategoria(categoria);
+      if (valor) {
+        categoriasSet.add(valor);
+      }
+    });
+
+    itensEstoque.forEach(function (item) {
+      const valor = normalizarNomeCategoria(item.categoria || "");
+      if (valor) {
+        categoriasSet.add(valor);
+      }
+    });
+
+    return Array.from(categoriasSet).sort(function (a, b) {
+      return a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    });
+  }
+
+  function popularCategoriasDinamicas() {
+    const categorias = obterCategoriasDinamicas();
+    const valorAtualCategoria = campoCategoria ? campoCategoria.value : "";
+    const valorAtualFiltro = filtroCategoriaEstoque ? filtroCategoriaEstoque.value : "";
+
+    if (campoCategoria) {
+      campoCategoria.innerHTML = "";
+      campoCategoria.appendChild(criarOption("", "Selecione a categoria"));
+      categorias.forEach(function (categoria) {
+        campoCategoria.appendChild(criarOption(categoria, categoria));
+      });
+      campoCategoria.appendChild(criarOption("__nova__", "Nova categoria"));
+
+      if (
+        valorAtualCategoria &&
+        Array.from(campoCategoria.options).some(function (option) {
+          return option.value === valorAtualCategoria;
+        })
+      ) {
+        campoCategoria.value = valorAtualCategoria;
+      } else {
+        campoCategoria.value = "";
+      }
+
+      alternarCampoCategoriaNova();
+    }
+
+    if (filtroCategoriaEstoque) {
+      filtroCategoriaEstoque.innerHTML = "";
+      filtroCategoriaEstoque.appendChild(criarOption("", "Todas as categorias"));
+
+      categorias.forEach(function (categoria) {
+        filtroCategoriaEstoque.appendChild(criarOption(categoria, categoria));
+      });
+
+      if (
+        valorAtualFiltro &&
+        Array.from(filtroCategoriaEstoque.options).some(function (option) {
+          return option.value === valorAtualFiltro;
+        })
+      ) {
+        filtroCategoriaEstoque.value = valorAtualFiltro;
+      } else {
+        filtroCategoriaEstoque.value = "";
+        filtrosAtivos.categoria = "";
+      }
+    }
+  }
+
+  function criarOption(valor, texto) {
+    const option = document.createElement("option");
+    option.value = valor;
+    option.textContent = texto;
+    return option;
+  }
+
+  function alternarCampoOutro(selectElement, wrapperElement, inputElement) {
+    if (selectElement.value === "outro(s)") {
+      wrapperElement.classList.remove("d-none");
+      inputElement.required = true;
+    } else {
+      wrapperElement.classList.add("d-none");
+      inputElement.required = false;
+      inputElement.value = "";
+    }
+  }
+
+  function alternarCampoCategoriaNova() {
+    if (!campoCategoria || !campoCategoriaOutraWrapper || !campoCategoriaOutra) {
+      return;
+    }
+
+    if (campoCategoria.value === "__nova__") {
+      campoCategoriaOutraWrapper.classList.remove("d-none");
+      campoCategoriaOutra.required = true;
+    } else {
+      campoCategoriaOutraWrapper.classList.add("d-none");
+      campoCategoriaOutra.required = false;
+      campoCategoriaOutra.value = "";
+    }
+  }
+
+  function preencherFormulario(item) {
+    campoNome.value = item.nome;
+    campoQuantidadeCadastro.value = formatarValorCampo(item.quantidade);
+
+    preencherSelectOuOutro(
+      campoUnidade,
+      campoUnidadeOutraWrapper,
+      campoUnidadeOutra,
+      item.unidade
+    );
+
+    preencherCampoCategoria(item.categoria || "");
+  }
+
+  function preencherCampoCategoria(categoria) {
+    const categoriaNormalizada = normalizarNomeCategoria(categoria);
+
+    if (!categoriaNormalizada) {
+      campoCategoria.value = "";
+      alternarCampoCategoriaNova();
+      return;
+    }
+
+    const existeNaLista = Array.from(campoCategoria.options).some(function (option) {
+      return normalizarTexto(option.value) === normalizarTexto(categoriaNormalizada);
+    });
+
+    if (existeNaLista) {
+      campoCategoria.value = categoriaNormalizada;
+      campoCategoriaOutra.value = "";
+    } else {
+      campoCategoria.value = "__nova__";
+      campoCategoriaOutra.value = categoriaNormalizada;
+    }
+
+    alternarCampoCategoriaNova();
+  }
+
+  function preencherSelectOuOutro(selectElement, wrapperElement, inputElement, valor) {
+    const valorExisteNaLista = Array.from(selectElement.options).some(function (option) {
+      return option.value === valor;
+    });
+
+    if (!valor) {
+      selectElement.value = "";
+      wrapperElement.classList.add("d-none");
+      inputElement.required = false;
+      inputElement.value = "";
+      return;
+    }
+
+    if (valorExisteNaLista) {
+      selectElement.value = valor;
+      wrapperElement.classList.add("d-none");
+      inputElement.required = false;
+      inputElement.value = "";
+      return;
+    }
+
+    selectElement.value = "outro(s)";
+    wrapperElement.classList.remove("d-none");
+    inputElement.required = true;
+    inputElement.value = valor;
+  }
+
+  function limparFormulario() {
+    estoqueForm.reset();
+
+    campoUnidade.value = "unidade(s)";
+    campoUnidadeOutraWrapper.classList.add("d-none");
+    campoUnidadeOutra.required = false;
+    campoUnidadeOutra.value = "";
+
+    campoCategoria.value = "";
+    campoCategoriaOutraWrapper.classList.add("d-none");
+    campoCategoriaOutra.required = false;
+    campoCategoriaOutra.value = "";
+  }
+
+  function renderizarTabela() {
+    estoqueTabela.innerHTML = "";
+
+    const itensFiltrados = aplicarFiltros(itensEstoque);
+    const itensOrdenados = aplicarOrdenacao(itensFiltrados);
+
+    atualizarResumoFiltros();
+    atualizarIndicadoresOrdenacao();
+    atualizarContadorItens(itensOrdenados.length);
+
+    if (itensOrdenados.length === 0) {
+      const haItensCadastrados = itensEstoque.length > 0;
+
+      estoqueTabela.innerHTML = `
+        <tr id="estoque-estado-vazio">
+          <td colspan="5" class="text-center text-muted empty-state">
+            ${haItensCadastrados ? "Nenhum item corresponde aos filtros aplicados." : "Nenhum item cadastrado até o momento."}
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    itensOrdenados.forEach(function (item) {
+      estoqueTabela.appendChild(criarLinhaTabela(item));
+    });
+  }
+
+  function criarLinhaTabela(item) {
+    const indiceReal = encontrarIndiceRealDoItem(item);
+    let linha = null;
+
+    if (templateLinhaEstoque) {
+      const fragmento = templateLinhaEstoque.content.cloneNode(true);
+      linha = fragmento.querySelector("tr");
+    } else {
+      linha = document.createElement("tr");
+      linha.innerHTML = `
+        <td class="cell-acoes">
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-primary btn-sm btn-editar-estoque">Editar</button>
+            <button type="button" class="btn btn-outline-danger btn-sm btn-excluir-estoque">Excluir</button>
+          </div>
+        </td>
+        <td class="item-nome"></td>
+        <td class="item-unidade"></td>
+        <td class="item-quantidade cell-quantidade"></td>
+        <td class="item-categoria"></td>
+      `;
+    }
+
+    linha.classList.add("item-row");
+    linha.dataset.item = normalizarTexto(item.nome);
+    linha.dataset.categoria = normalizarTexto(item.categoria);
+    linha.dataset.quantidade = String(Number(item.quantidade) || 0);
+    linha.dataset.unidade = normalizarTexto(item.unidade);
+
+    if (Number(item.quantidade) === 0) {
+      linha.classList.add("is-zero", "status-danger");
+    }
+
+    if (Number(item.quantidade) > 0 && Number(item.quantidade) <= 1) {
+      linha.classList.add("is-baixo");
+    }
+
+    preencherLinhaTabela(linha, item, indiceReal);
+    return linha;
+  }
+
+  function preencherLinhaTabela(linha, item, indiceReal) {
+    const celulaNome = linha.querySelector(".item-nome");
+    const celulaUnidade = linha.querySelector(".item-unidade");
+    const celulaQuantidade = linha.querySelector(".item-quantidade");
+    const celulaCategoria = linha.querySelector(".item-categoria");
+
+    if (celulaNome) {
+      celulaNome.textContent = item.nome;
+    }
+
+    if (celulaUnidade) {
+      celulaUnidade.textContent = item.unidade;
+    }
+
+    if (celulaQuantidade) {
+      celulaQuantidade.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-diminuir-estoque">
+            -
+          </button>
+
+          <input
+            type="text"
+            inputmode="decimal"
+            class="form-control form-control-sm campo-quantidade"
+            value="${escaparAtributo(formatarValorCampo(item.quantidade))}"
           >
-            ☰ Menu
-          </button>
 
-          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-          <a href="estoque.html" class="btn btn-primary btn-sm" aria-current="page">Estoque</a>
-          <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
-          <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-        </div>
-      </div>
-    </nav>
-  </header>
-
-  <aside class="site-map-left" id="menu-lateral-estoque" aria-label="Menu lateral">
-    <div class="site-map-left-hover-area" aria-hidden="true"></div>
-
-    <div class="site-map-left-content">
-      <div class="p-3">
-        <div class="d-flex justify-content-between align-items-center mb-3 d-lg-none">
-          <h2 class="h6 mb-0">Mapa do site</h2>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            id="btn-fechar-menu-mobile"
-            aria-label="Fechar menu de navegação"
-          >
-            Fechar
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-aumentar-estoque">
+            +
           </button>
         </div>
+      `;
+    }
 
-        <h2 class="h6 mb-3 d-none d-lg-block">Mapa do site</h2>
+    if (celulaCategoria) {
+      celulaCategoria.innerHTML = item.categoria
+        ? `<span class="badge-categoria">${escaparHtml(item.categoria)}</span>`
+        : "—";
+    }
 
-        <div class="d-grid gap-2">
-          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-          <a href="estoque.html" class="btn btn-primary btn-sm" aria-current="page">Estoque</a>
-          <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
-          <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-        </div>
-      </div>
-    </div>
-  </aside>
+    const botaoEditar = linha.querySelector(".btn-editar-estoque");
+    const botaoExcluir = linha.querySelector(".btn-excluir-estoque");
+    const botaoDiminuir = linha.querySelector(".btn-diminuir-estoque");
+    const botaoAumentar = linha.querySelector(".btn-aumentar-estoque");
+    const campoQuantidade = linha.querySelector(".campo-quantidade");
 
-  <div
-    class="menu-mobile-backdrop d-lg-none"
-    id="menu-mobile-backdrop"
-    hidden
-    aria-hidden="true"
-  ></div>
-
-  <div class="container py-4">
-    <main>
-      <header class="mb-4">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div>
-            <h1 class="h3 mb-1">Estoque</h1>
-            <p class="text-muted mb-0">Cadastre e acompanhe os itens disponíveis.</p>
-          </div>
-
-          <button
-            type="button"
-            class="btn btn-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#modalAdicionarItem"
-          >
-            Adicionar item
-          </button>
-        </div>
-      </header>
-
-      <section class="app-box mb-4" aria-labelledby="orientacao-estoque-titulo">
-        <h2 class="h4 mb-3" id="orientacao-estoque-titulo">Orientação</h2>
-        <p class="mb-0">
-          Use o botão <strong>Adicionar item</strong> para cadastrar produtos do estoque.
-          A tabela abaixo permite visualizar, editar, remover e ajustar a quantidade dos itens salvos.
-        </p>
-      </section>
-
-      <section class="app-box" aria-labelledby="itens-cadastrados-titulo">
-        <h2 class="h4 mb-3" id="itens-cadastrados-titulo">Itens cadastrados</h2>
-
-        <div class="table-responsive">
-          <table class="table table-bordered table-hover align-middle mb-0">
-            <thead class="table-light">
-              <tr>
-                <th scope="col">Ações</th>
-                <th scope="col">Item</th>
-                <th scope="col">Unidade</th>
-                <th scope="col">Quantidade</th>
-                <th scope="col">Categoria</th>
-              </tr>
-            </thead>
-            <tbody id="estoque-tabela">
-              <tr>
-                <td colspan="5" class="text-center text-muted">
-                  Nenhum item cadastrado até o momento.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <div
-    class="modal fade"
-    id="modalAdicionarItem"
-    tabindex="-1"
-    aria-labelledby="modalAdicionarItemLabel"
-    aria-hidden="true"
-  >
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <form id="estoque-form">
-          <div class="modal-header">
-            <h2 class="modal-title fs-5" id="modalAdicionarItemLabel">Adicionar item</h2>
-            <button
-              type="button"
-              class="btn-close"
-              data-bs-dismiss="modal"
-              aria-label="Fechar"
-            ></button>
-          </div>
-
-          <div class="modal-body">
-            <div class="mb-3">
-              <label for="item-nome" class="form-label">Nome do item</label>
-              <input
-                type="text"
-                class="form-control"
-                id="item-nome"
-                name="item-nome"
-                placeholder="Ex.: Arroz"
-                required
-              >
-            </div>
-
-            <div class="mb-3">
-              <label for="item-unidade" class="form-label">Unidade</label>
-              <select class="form-select" id="item-unidade" name="item-unidade" required>
-                <option value="">Selecione</option>
-                <option value="unidade(s)" selected>unidade(s)</option>
-                <option value="quilograma(s)">quilograma(s)</option>
-                <option value="grama(s)">grama(s)</option>
-                <option value="litro(s)">litro(s)</option>
-                <option value="mililitro(s)">mililitro(s)</option>
-                <option value="pacote(s)">pacote(s)</option>
-                <option value="caixa(s)">caixa(s)</option>
-                <option value="garrafa(s)">garrafa(s)</option>
-                <option value="pote(s)">pote(s)</option>
-                <option value="vasilha(s)">vasilha(s)</option>
-                <option value="outro(s)">outro(s)</option>
-              </select>
-            </div>
-
-            <div class="mb-3 d-none" id="campo-unidade-outra-wrapper">
-              <label for="campo-unidade-outra" class="form-label">Digite a unidade</label>
-              <input
-                type="text"
-                class="form-control"
-                id="campo-unidade-outra"
-                name="campo-unidade-outra"
-                placeholder="Digite a unidade"
-              >
-            </div>
-
-            <div class="mb-3">
-              <label for="item-quantidade" class="form-label">Quantidade</label>
-              <input
-                type="text"
-                inputmode="decimal"
-                class="form-control"
-                id="item-quantidade"
-                name="item-quantidade"
-                min="0"
-                step="0.01"
-                placeholder="Digite a quantidade"
-                required
-              >
-            </div>
-
-            <div class="mb-3">
-              <label for="item-categoria" class="form-label">Categoria</label>
-              <select class="form-select" id="item-categoria" name="item-categoria">
-                <option value="">Selecione</option>
-                <option value="alimento">alimento</option>
-                <option value="bebida">bebida</option>
-                <option value="limpeza">limpeza</option>
-                <option value="higiene">higiene</option>
-                <option value="beleza">beleza</option>
-                <option value="farmácia">farmácia</option>
-                <option value="utilidade doméstica">utilidade doméstica</option>
-                <option value="outro(s)">outro(s)</option>
-              </select>
-            </div>
-
-            <div class="mb-3 d-none" id="campo-categoria-outra-wrapper">
-              <label for="campo-categoria-outra" class="form-label">Digite a categoria</label>
-              <input
-                type="text"
-                class="form-control"
-                id="campo-categoria-outra"
-                name="campo-categoria-outra"
-                placeholder="Digite a categoria"
-              >
-            </div>
-
-            <div id="estoque-mensagem" class="small text-danger" aria-live="polite"></div>
-          </div>
-
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-              Cancelar
-            </button>
-            <button type="submit" class="btn btn-primary">
-              Salvar item
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <footer class="site-map-bottom mt-4">
-    <div class="container py-3">
-      <div class="d-flex flex-wrap gap-2 justify-content-center">
-        <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-        <a href="estoque.html" class="btn btn-primary btn-sm" aria-current="page">Estoque</a>
-        <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
-        <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-        <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-      </div>
-    </div>
-  </footer>
-
-  <div
-    class="modal fade"
-    id="modalItemRepetido"
-    tabindex="-1"
-    aria-labelledby="modalItemRepetidoLabel"
-    aria-hidden="true"
-  >
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title fs-5" id="modalItemRepetidoLabel">Item já adicionado</h2>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-            aria-label="Fechar"
-          ></button>
-        </div>
-
-        <div class="modal-body">
-          Este item já existe no estoque. O que deseja fazer?
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" id="btn-cancelar-item-repetido">
-            Cancelar
-          </button>
-          <button type="button" class="btn btn-warning" id="btn-editar-item-repetido">
-            Editar
-          </button>
-          <button type="button" class="btn btn-danger" id="btn-substituir-item-repetido">
-            Substituir
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    (function () {
-      const menu = document.getElementById("menu-lateral-estoque");
-      const menuContent = menu ? menu.querySelector(".site-map-left-content") : null;
-      const btnAbrir = document.getElementById("btn-menu-mobile");
-      const btnFechar = document.getElementById("btn-fechar-menu-mobile");
-      const backdrop = document.getElementById("menu-mobile-backdrop");
-
-      function abrirMenu() {
-        if (!menu || !menuContent || !btnAbrir || !backdrop) {
+    if (botaoEditar) {
+      botaoEditar.addEventListener("click", function () {
+        if (indiceReal < 0) {
           return;
         }
 
-        menu.classList.add("is-open");
-        menuContent.classList.add("is-open");
-        backdrop.hidden = false;
-        btnAbrir.setAttribute("aria-expanded", "true");
-        document.body.classList.add("menu-mobile-open");
-      }
+        preencherFormulario(itensEstoque[indiceReal]);
+        indiceEdicao = indiceReal;
+        campoMensagem.textContent = "";
+        modalBootstrap.show();
+      });
+    }
 
-      function fecharMenu() {
-        if (!menu || !menuContent || !btnAbrir || !backdrop) {
+    if (botaoExcluir) {
+      botaoExcluir.addEventListener("click", function () {
+        if (indiceReal < 0) {
           return;
         }
 
-        menu.classList.remove("is-open");
-        menuContent.classList.remove("is-open");
-        backdrop.hidden = true;
-        btnAbrir.setAttribute("aria-expanded", "false");
-        document.body.classList.remove("menu-mobile-open");
-      }
-
-      if (btnAbrir) {
-        btnAbrir.addEventListener("click", abrirMenu);
-      }
-
-      if (btnFechar) {
-        btnFechar.addEventListener("click", fecharMenu);
-      }
-
-      if (backdrop) {
-        backdrop.addEventListener("click", fecharMenu);
-      }
-
-      document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape") {
-          fecharMenu();
+        const desejaRemover = confirm("Deseja remover este item do estoque?");
+        if (!desejaRemover) {
+          return;
         }
-      });
 
-      window.addEventListener("resize", function () {
-        if (window.innerWidth >= 992) {
-          fecharMenu();
+        const itemRemovido = itensEstoque[indiceReal];
+        registrarMovimentacaoEstoque("remocao", itemRemovido, itemRemovido.quantidade, 0);
+
+        itensEstoque.splice(indiceReal, 1);
+        salvarEstoque();
+        popularCategoriasDinamicas();
+        renderizarTabela();
+      });
+    }
+
+    if (botaoDiminuir) {
+      botaoDiminuir.addEventListener("click", function () {
+        if (indiceReal < 0) {
+          return;
         }
-      });
-    })();
-  </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="estoque.js"></script>
-</body>
-</html>
+        const quantidadeAnterior = Number(itensEstoque[indiceReal].quantidade) || 0;
+        const quantidadeNova = Math.max(0, quantidadeAnterior - 1);
+
+        if (quantidadeNova === quantidadeAnterior) {
+          return;
+        }
+
+        itensEstoque[indiceReal].quantidade = quantidadeNova;
+        registrarMovimentacaoEstoque("ajuste", itensEstoque[indiceReal], quantidadeAnterior, quantidadeNova);
+        salvarEstoque();
+        renderizarTabela();
+      });
+    }
+
+    if (botaoAumentar) {
+      botaoAumentar.addEventListener("click", function () {
+        if (indiceReal < 0) {
+          return;
+        }
+
+        const quantidadeAnterior = Number(itensEstoque[indiceReal].quantidade) || 0;
+        const quantidadeNova = quantidadeAnterior + 1;
+
+        if (quantidadeNova === quantidadeAnterior) {
+          return;
+        }
+
+        itensEstoque[indiceReal].quantidade = quantidadeNova;
+        registrarMovimentacaoEstoque("ajuste", itensEstoque[indiceReal], quantidadeAnterior, quantidadeNova);
+        salvarEstoque();
+        renderizarTabela();
+      });
+    }
+
+    if (campoQuantidade) {
+      campoQuantidade.addEventListener("change", function () {
+        if (indiceReal < 0) {
+          return;
+        }
+
+        const quantidadeAnterior = Number(itensEstoque[indiceReal].quantidade) || 0;
+        let quantidadeNova = normalizarNumero(campoQuantidade.value);
+
+        if (Number.isNaN(quantidadeNova) || quantidadeNova < 0) {
+          quantidadeNova = 0;
+        }
+
+        if (quantidadeNova === quantidadeAnterior) {
+          renderizarTabela();
+          return;
+        }
+
+        itensEstoque[indiceReal].quantidade = quantidadeNova;
+        registrarMovimentacaoEstoque("ajuste", itensEstoque[indiceReal], quantidadeAnterior, quantidadeNova);
+        salvarEstoque();
+        renderizarTabela();
+      });
+    }
+  }
+
+  function aplicarFiltros(lista) {
+    return lista.filter(function (item) {
+      const correspondeItem =
+        !filtrosAtivos.item ||
+        normalizarTexto(item.nome).includes(normalizarTexto(filtrosAtivos.item));
+
+      const correspondeCategoria =
+        !filtrosAtivos.categoria ||
+        normalizarTexto(item.categoria) === normalizarTexto(filtrosAtivos.categoria);
+
+      return correspondeItem && correspondeCategoria;
+    });
+  }
+
+  function aplicarOrdenacao(lista) {
+    const listaOrdenada = lista.slice();
+
+    listaOrdenada.sort(function (a, b) {
+      let comparacao = 0;
+
+      if (estadoOrdenacao.campo === "item") {
+        comparacao = compararTexto(a.nome, b.nome);
+      } else if (estadoOrdenacao.campo === "categoria") {
+        comparacao = compararTexto(a.categoria, b.categoria);
+      } else if (estadoOrdenacao.campo === "quantidade") {
+        comparacao = compararNumero(a.quantidade, b.quantidade);
+      }
+
+      if (comparacao === 0) {
+        comparacao = compararTexto(a.nome, b.nome);
+      }
+
+      return estadoOrdenacao.direcao === "desc" ? comparacao * -1 : comparacao;
+    });
+
+    return listaOrdenada;
+  }
+
+  function configurarOrdenacaoPorCabecalho(elemento, campo) {
+    if (!elemento) {
+      return;
+    }
+
+    function alternarOrdenacao() {
+      if (estadoOrdenacao.campo === campo) {
+        estadoOrdenacao.direcao = estadoOrdenacao.direcao === "asc" ? "desc" : "asc";
+      } else {
+        estadoOrdenacao.campo = campo;
+        estadoOrdenacao.direcao = "asc";
+      }
+
+      sincronizarOrdenacaoComSelect();
+      renderizarTabela();
+    }
+
+    elemento.addEventListener("click", alternarOrdenacao);
+
+    elemento.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        alternarOrdenacao();
+      }
+    });
+  }
+
+  function sincronizarOrdenacaoPeloSelect() {
+    if (!ordenacaoEstoque) {
+      return;
+    }
+
+    const valor = ordenacaoEstoque.value || "item-asc";
+    const partes = valor.split("-");
+
+    estadoOrdenacao.campo = partes[0] || "item";
+    estadoOrdenacao.direcao = partes[1] || "asc";
+  }
+
+  function sincronizarOrdenacaoComSelect() {
+    if (!ordenacaoEstoque) {
+      return;
+    }
+
+    ordenacaoEstoque.value = `${estadoOrdenacao.campo}-${estadoOrdenacao.direcao}`;
+  }
+
+  function atualizarIndicadoresOrdenacao() {
+    const cabecalhos = [
+      { elemento: ordenarColunaItem, campo: "item" },
+      { elemento: ordenarColunaQuantidade, campo: "quantidade" },
+      { elemento: ordenarColunaCategoria, campo: "categoria" }
+    ];
+
+    cabecalhos.forEach(function (cabecalho) {
+      if (!cabecalho.elemento) {
+        return;
+      }
+
+      const indicador = cabecalho.elemento.querySelector(".sort-indicator");
+      const ativo = estadoOrdenacao.campo === cabecalho.campo;
+
+      cabecalho.elemento.setAttribute(
+        "aria-sort",
+        ativo ? (estadoOrdenacao.direcao === "asc" ? "ascending" : "descending") : "none"
+      );
+
+      if (indicador) {
+        indicador.textContent = !ativo ? "↕" : estadoOrdenacao.direcao === "asc" ? "↑" : "↓";
+      }
+    });
+  }
+
+  function atualizarResumoFiltros() {
+    if (!resumoFiltrosEstoque) {
+      return;
+    }
+
+    resumoFiltrosEstoque.innerHTML = "";
+
+    if (filtrosAtivos.item) {
+      resumoFiltrosEstoque.appendChild(
+        criarChipFiltro("Item: " + filtrosAtivos.item, function () {
+          filtrosAtivos.item = "";
+          if (filtroItemEstoque) {
+            filtroItemEstoque.value = "";
+          }
+          renderizarTabela();
+        })
+      );
+    }
+
+    if (filtrosAtivos.categoria) {
+      resumoFiltrosEstoque.appendChild(
+        criarChipFiltro("Categoria: " + filtrosAtivos.categoria, function () {
+          filtrosAtivos.categoria = "";
+          if (filtroCategoriaEstoque) {
+            filtroCategoriaEstoque.value = "";
+          }
+          renderizarTabela();
+        })
+      );
+    }
+  }
+
+  function criarChipFiltro(texto, aoRemover) {
+    const chip = document.createElement("span");
+    chip.className = "filter-chip";
+
+    const textoChip = document.createElement("span");
+    textoChip.textContent = texto;
+
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.setAttribute("aria-label", "Remover filtro");
+    botao.innerHTML = "&times;";
+    botao.addEventListener("click", aoRemover);
+
+    chip.appendChild(textoChip);
+    chip.appendChild(botao);
+
+    return chip;
+  }
+
+  function atualizarContadorItens(quantidade) {
+    if (!contadorItensEstoque) {
+      return;
+    }
+
+    contadorItensEstoque.textContent = `${quantidade} item(ns) exibido(s)`;
+  }
+
+  function encontrarIndiceRealDoItem(itemOrdenado) {
+    return itensEstoque.findIndex(function (itemOriginal) {
+      return (
+        normalizarTexto(itemOriginal.nome) === normalizarTexto(itemOrdenado.nome) &&
+        normalizarTexto(itemOriginal.unidade) === normalizarTexto(itemOrdenado.unidade) &&
+        normalizarTexto(itemOriginal.categoria) === normalizarTexto(itemOrdenado.categoria) &&
+        Number(itemOriginal.quantidade) === Number(itemOrdenado.quantidade)
+      );
+    });
+  }
+
+  function houveMudancaRelevante(itemAnterior, itemNovo) {
+    return (
+      normalizarTexto(itemAnterior.nome) !== normalizarTexto(itemNovo.nome) ||
+      normalizarTexto(itemAnterior.unidade) !== normalizarTexto(itemNovo.unidade) ||
+      normalizarTexto(itemAnterior.categoria || "") !== normalizarTexto(itemNovo.categoria || "")
+    );
+  }
+
+  function compararTexto(a, b) {
+    return String(a || "").localeCompare(String(b || ""), "pt-BR", {
+      sensitivity: "base"
+    });
+  }
+
+  function compararNumero(a, b) {
+    return (Number(a) || 0) - (Number(b) || 0);
+  }
+
+  function normalizarNumero(valor) {
+    const texto = String(valor || "")
+      .trim()
+      .replace(/\s+/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+
+    return parseFloat(texto);
+  }
+
+  function normalizarTexto(valor) {
+    return String(valor || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function normalizarNomeCategoria(valor) {
+    return String(valor || "").trim().replace(/\s+/g, " ");
+  }
+
+  function formatarValorCampo(valor) {
+    const numero = Number(valor);
+
+    if (Number.isInteger(numero)) {
+      return String(numero);
+    }
+
+    return String(numero).replace(".", ",");
+  }
+
+  function escaparHtml(valor) {
+    return String(valor || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function escaparAtributo(valor) {
+    return escaparHtml(valor);
+  }
+});
