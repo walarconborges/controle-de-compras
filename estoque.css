@@ -98,7 +98,89 @@ body.menu-mobile-open {
   font-weight: 500;
 }
 
-/* Destaca itens críticos como quantidade 0 */
+/* Barra de ações da página: filtros, ordenação e busca */
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.toolbar-actions .form-group,
+.toolbar-actions .form-floating,
+.toolbar-actions .input-group {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.toolbar-actions .toolbar-button {
+  flex: 0 0 auto;
+}
+
+/* Resumo de filtros ativos */
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-summary:empty {
+  display: none;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 999px;
+  background-color: #f8f9fa;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.filter-chip button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* Select preparado para categoria dinâmica */
+.select-categoria-dinamica {
+  min-width: 180px;
+}
+
+/* Cabeçalhos clicáveis para ordenação */
+.sortable-header {
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sortable-header:hover {
+  background-color: #f8f9fa;
+}
+
+.sortable-header .sort-indicator {
+  display: inline-block;
+  min-width: 14px;
+  margin-left: 4px;
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+/* Estados de linha */
+.item-row {
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.item-row.is-zero td,
 .status-danger td {
   background-color: #f8d7da;
 }
@@ -108,8 +190,81 @@ body.menu-mobile-open {
   background-color: #f8d7da;
 }
 
+.item-row.is-baixo td {
+  background-color: #fff3cd;
+}
+
+/* Estado visual útil para integração futura com checkbox Comprar */
+.item-row.is-comprado {
+  background-color: #f1f8f4;
+}
+
+.item-row.is-comprado td {
+  color: #6c757d;
+}
+
+.item-row.is-comprado .item-nome,
+.item-row.is-comprado .item-categoria,
+.item-row.is-comprado .item-quantidade {
+  text-decoration: line-through;
+}
+
+/* Checkbox */
+.checkbox-comprar {
+  cursor: pointer;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.checkbox-comprar:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Alinhamento consistente */
+.cell-acoes,
+.cell-quantidade,
+.cell-checkbox,
+.cell-status {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cell-quantidade,
+.cell-checkbox,
+.cell-status {
+  text-align: center;
+}
+
 .campo-quantidade {
   min-width: 90px;
+}
+
+/* Badge de categoria */
+.badge-categoria {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+/* Estado vazio */
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: #6c757d;
+}
+
+.hidden-row {
+  display: none !important;
+}
+
+/* Melhor espaçamento para seções de formulário */
+.form-section + .form-section {
+  margin-top: 16px;
 }
 
 /* Ajustes para mobile */
@@ -133,6 +288,17 @@ body.menu-mobile-open {
   .app-box {
     padding: 18px;
   }
+
+  .toolbar-actions {
+    gap: 10px;
+  }
+
+  .toolbar-actions .form-group,
+  .toolbar-actions .form-floating,
+  .toolbar-actions .input-group {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
 }
 
 /* Ajustes extras para telas muito pequenas */
@@ -149,5 +315,13 @@ body.menu-mobile-open {
 
   .campo-quantidade {
     min-width: 72px;
+  }
+
+  .filter-chip {
+    font-size: 0.8rem;
+  }
+
+  .sortable-header .sort-indicator {
+    margin-left: 2px;
   }
 }
