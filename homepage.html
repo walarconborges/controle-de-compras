@@ -88,6 +88,16 @@
         </p>
       </section>
 
+      <section class="app-box mb-4" aria-labelledby="estado-atual-titulo">
+        <h2 class="h5 mb-3" id="estado-atual-titulo">Estado atual do projeto</h2>
+        <p>
+          O sistema já está sendo ajustado para trabalhar com categorias dinâmicas, ordenação e filtros nas páginas principais.
+        </p>
+        <p class="mb-0">
+          A lógica real do checkbox <strong>Comprar</strong> continua pendente para a página <strong>Lista</strong>, que é a próxima etapa central do fluxo.
+        </p>
+      </section>
+
       <section aria-labelledby="atalhos-titulo">
         <h2 class="visually-hidden" id="atalhos-titulo">Atalhos principais</h2>
 
@@ -97,7 +107,7 @@
               <div class="app-box home-card h-100">
                 <h3 class="h5">Estoque</h3>
                 <p class="mb-0">
-                  Mostra todos os itens cadastrados, a quantidade disponível e a categoria de cada item.
+                  Mostra todos os itens cadastrados, a quantidade disponível, a categoria dinâmica de cada item e os controles de filtro e ordenação.
                 </p>
               </div>
             </a>
@@ -108,7 +118,7 @@
               <div class="app-box home-card h-100">
                 <h3 class="h5">Lista</h3>
                 <p class="mb-0">
-                  Exibe os itens cadastrados para organizar o que precisa ser comprado e acompanhar o que está faltando.
+                  Exibe os itens usados para organizar o que precisa ser comprado e será a página responsável pela lógica real do checkbox Comprar.
                 </p>
               </div>
             </a>
@@ -119,7 +129,7 @@
               <div class="app-box home-card h-100">
                 <h3 class="h5">Compra</h3>
                 <p class="mb-0">
-                  Registra o que foi comprado de fato, calcula o valor total da compra e atualiza o estoque.
+                  Registra o que foi comprado de fato, trabalha com categoria dinâmica, permite filtros e ordenação e atualiza o estoque ao finalizar a compra.
                 </p>
               </div>
             </a>
@@ -130,7 +140,7 @@
               <div class="app-box home-card h-100">
                 <h3 class="h5">Consumo</h3>
                 <p class="mb-0">
-                  Acompanha médias de consumo e médias de compras com visualizações em tabela, lista e gráficos.
+                  Acompanha médias de consumo e médias de compras com filtros, ordenação e visualizações em tabela, lista e gráficos.
                 </p>
               </div>
             </a>
@@ -144,6 +154,7 @@
           <li>Consultar os itens cadastrados no estoque.</li>
           <li>Verificar os itens com quantidade baixa ou igual a zero.</li>
           <li>Usar a lista como apoio para organizar o que precisa ser comprado.</li>
+          <li>Marcar corretamente os itens na lista quando a lógica real do checkbox Comprar estiver concluída.</li>
           <li>Registrar a compra real na página de compra.</li>
           <li>Atualizar automaticamente o estoque ao finalizar a compra.</li>
           <li>Acompanhar o histórico de consumo e de compras na página de consumo.</li>
