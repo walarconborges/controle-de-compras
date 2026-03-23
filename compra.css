@@ -85,6 +85,161 @@ body {
   font-weight: 500;
 }
 
+/* Barra de ações da página: filtros, ordenação e busca */
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.toolbar-actions .form-group,
+.toolbar-actions .form-floating,
+.toolbar-actions .input-group {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.toolbar-actions .toolbar-button {
+  flex: 0 0 auto;
+}
+
+/* Faixa de resumo de filtros ativos */
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-summary:empty {
+  display: none;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 999px;
+  background-color: #f8f9fa;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.filter-chip button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* Select de categoria preparado para receber opções dinâmicas */
+.select-categoria-dinamica {
+  min-width: 180px;
+}
+
+/* Estados visuais para itens da lista e checkbox Comprar */
+.item-row {
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.item-row.is-comprado {
+  background-color: #f1f8f4;
+}
+
+.item-row.is-comprado td {
+  color: #6c757d;
+}
+
+.item-row.is-comprado .item-nome,
+.item-row.is-comprado .item-categoria,
+.item-row.is-comprado .item-quantidade {
+  text-decoration: line-through;
+}
+
+.item-row.is-pendente {
+  background-color: #ffffff;
+}
+
+/* Checkbox Comprar */
+.checkbox-comprar {
+  cursor: pointer;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.checkbox-comprar:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Realce leve para colunas clicáveis de ordenação */
+.sortable-header {
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sortable-header .sort-indicator {
+  display: inline-block;
+  min-width: 14px;
+  margin-left: 4px;
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.sortable-header:hover {
+  background-color: #f8f9fa;
+}
+
+/* Estados de tabela */
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: #6c757d;
+}
+
+.hidden-row {
+  display: none !important;
+}
+
+/* Quantidade e células de tabela com alinhamento consistente */
+.cell-quantidade,
+.cell-acoes,
+.cell-comprar {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cell-comprar {
+  text-align: center;
+}
+
+.cell-quantidade {
+  text-align: center;
+}
+
+/* Badge opcional para categoria */
+.badge-categoria {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+/* Melhor espaçamento em formulários que alimentam categoria dinâmica */
+.form-section + .form-section {
+  margin-top: 16px;
+}
+
 /* Ajustes para mobile */
 @media (max-width: 991.98px) {
   .site-map-left {
@@ -106,6 +261,17 @@ body {
   .app-box {
     padding: 18px;
   }
+
+  .toolbar-actions {
+    gap: 10px;
+  }
+
+  .toolbar-actions .form-group,
+  .toolbar-actions .form-floating,
+  .toolbar-actions .input-group {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
 }
 
 /* Ajustes extras para telas muito pequenas */
@@ -118,5 +284,13 @@ body {
   .site-map-left-content {
     width: 240px;
     max-width: 88vw;
+  }
+
+  .filter-chip {
+    font-size: 0.8rem;
+  }
+
+  .sortable-header .sort-indicator {
+    margin-left: 2px;
   }
 }
