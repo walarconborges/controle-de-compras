@@ -10,7 +10,6 @@
 </head>
 <body>
   <header>
-    <!-- Mapa do site superior -->
     <nav class="site-map-top">
       <div class="container py-2">
         <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
@@ -35,7 +34,6 @@
     </nav>
   </header>
 
-  <!-- Mapa do site lateral esquerdo -->
   <aside class="site-map-left" id="menu-lateral-compra" aria-label="Menu lateral">
     <div class="site-map-left-hover-area" aria-hidden="true"></div>
 
@@ -87,6 +85,7 @@
             class="btn btn-primary"
             data-bs-toggle="modal"
             data-bs-target="#modalAdicionarCompra"
+            id="btn-abrir-modal-adicionar-compra"
           >
             Adicionar compra
           </button>
@@ -115,24 +114,120 @@
         </div>
       </section>
 
+      <section class="app-box mb-4" aria-labelledby="filtros-compra-titulo">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <h2 class="h4 mb-1" id="filtros-compra-titulo">Filtros e ordenação</h2>
+            <p class="text-muted mb-0">Filtre por item e categoria e ordene os registros exibidos.</p>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="btn-limpar-filtros-compra"
+          >
+            Limpar filtros
+          </button>
+        </div>
+
+        <div class="toolbar-actions" id="toolbar-compra">
+          <div class="form-group">
+            <label for="filtro-item-compra" class="form-label">Filtrar por item</label>
+            <input
+              type="text"
+              class="form-control"
+              id="filtro-item-compra"
+              placeholder="Digite o nome do item"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="filtro-categoria-compra" class="form-label">Filtrar por categoria</label>
+            <select
+              class="form-select select-categoria-dinamica"
+              id="filtro-categoria-compra"
+            >
+              <option value="">Todas as categorias</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="ordenacao-compra" class="form-label">Ordenar por</label>
+            <select class="form-select" id="ordenacao-compra">
+              <option value="item-asc">Item (A-Z)</option>
+              <option value="item-desc">Item (Z-A)</option>
+              <option value="categoria-asc">Categoria (A-Z)</option>
+              <option value="categoria-desc">Categoria (Z-A)</option>
+              <option value="quantidade-asc">Quantidade (menor para maior)</option>
+              <option value="quantidade-desc">Quantidade (maior para menor)</option>
+            </select>
+          </div>
+        </div>
+
+        <div
+          id="resumo-filtros-compra"
+          class="filter-summary"
+          aria-live="polite"
+          aria-label="Resumo dos filtros ativos"
+        ></div>
+      </section>
+
       <section class="app-box" aria-labelledby="itens-comprados-titulo">
-        <h2 class="h4 mb-3" id="itens-comprados-titulo">Itens comprados</h2>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <h2 class="h4 mb-0" id="itens-comprados-titulo">Itens comprados</h2>
+          <span class="text-muted small" id="contador-itens-compra">0 item(ns) exibido(s)</span>
+        </div>
 
         <div class="table-responsive">
           <table class="table table-bordered table-hover align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th scope="col">Ações</th>
-                <th scope="col">Item</th>
-                <th scope="col">Quantidade</th>
+                <th scope="col" class="cell-acoes">Ações</th>
+                <th
+                  scope="col"
+                  class="sortable-header"
+                  id="ordenar-coluna-item-compra"
+                  data-sort-key="item"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Ordenar por item"
+                >
+                  Item
+                  <span class="sort-indicator" aria-hidden="true">↕</span>
+                </th>
+                <th
+                  scope="col"
+                  class="sortable-header cell-quantidade"
+                  id="ordenar-coluna-quantidade-compra"
+                  data-sort-key="quantidade"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Ordenar por quantidade"
+                >
+                  Quantidade
+                  <span class="sort-indicator" aria-hidden="true">↕</span>
+                </th>
                 <th scope="col">Unidade</th>
+                <th
+                  scope="col"
+                  class="sortable-header"
+                  id="ordenar-coluna-categoria-compra"
+                  data-sort-key="categoria"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Ordenar por categoria"
+                >
+                  Categoria
+                  <span class="sort-indicator" aria-hidden="true">↕</span>
+                </th>
                 <th scope="col">Valor unitário</th>
                 <th scope="col">Subtotal</th>
               </tr>
             </thead>
             <tbody id="compra-tabela">
-              <tr>
-                <td colspan="6" class="text-center text-muted">
+              <tr id="compra-estado-vazio">
+                <td colspan="7" class="text-center text-muted empty-state">
                   Nenhuma compra registrada até o momento.
                 </td>
               </tr>
@@ -143,7 +238,6 @@
     </main>
   </div>
 
-  <!-- Modal de adicionar compra -->
   <div
     class="modal fade"
     id="modalAdicionarCompra"
@@ -182,6 +276,32 @@
                 role="listbox"
                 aria-label="Sugestões de itens"
               ></div>
+            </div>
+
+            <div class="mb-3">
+              <label for="compra-categoria" class="form-label">Categoria</label>
+              <select
+                class="form-select select-categoria-dinamica"
+                id="compra-categoria"
+                name="compra-categoria"
+                required
+              >
+                <option value="">Selecione a categoria</option>
+              </select>
+              <div class="form-text">
+                As categorias devem ser carregadas dinamicamente pelo sistema.
+              </div>
+            </div>
+
+            <div class="mb-3 d-none" id="campo-compra-nova-categoria-wrapper">
+              <label for="campo-compra-nova-categoria" class="form-label">Nova categoria</label>
+              <input
+                type="text"
+                class="form-control"
+                id="campo-compra-nova-categoria"
+                name="campo-compra-nova-categoria"
+                placeholder="Digite a nova categoria"
+              >
             </div>
 
             <div class="mb-3">
@@ -238,7 +358,7 @@
                 name="compra-valor-unitario"
                 min="0"
                 step="0.01"
-                placeholder="Ex.: 12.50"
+                placeholder="Ex.: 12,50"
                 required
               >
             </div>
@@ -259,7 +379,6 @@
     </div>
   </div>
 
-  <!-- Mapa do site inferior -->
   <footer class="site-map-bottom mt-4">
     <div class="container py-3">
       <div class="d-flex flex-wrap gap-2 justify-content-center">
@@ -272,7 +391,6 @@
     </div>
   </footer>
 
-  <!-- Modal de item repetido -->
   <div
     class="modal fade"
     id="modalItemRepetidoCompra"
@@ -310,6 +428,27 @@
       </div>
     </div>
   </div>
+
+  <template id="template-linha-compra">
+    <tr class="item-row" data-item="" data-categoria="" data-quantidade="" data-unidade="" data-valor-unitario="" data-subtotal="">
+      <td class="cell-acoes">
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-primary btn-sm btn-editar-compra">
+            Editar
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm btn-excluir-compra">
+            Excluir
+          </button>
+        </div>
+      </td>
+      <td class="item-nome"></td>
+      <td class="item-quantidade cell-quantidade"></td>
+      <td class="item-unidade"></td>
+      <td class="item-categoria"></td>
+      <td class="item-valor-unitario"></td>
+      <td class="item-subtotal"></td>
+    </tr>
+  </template>
 
   <script>
     (function () {
