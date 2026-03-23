@@ -1,55 +1,330 @@
-document.addEventListener("DOMContentLoaded", function () {
-  const loginForm = document.getElementById("login-form");
-  const emailInput = document.getElementById("email");
-  const senhaInput = document.getElementById("senha");
-  const loginMessage = document.getElementById("login-message");
-  const authTokenInput = document.getElementById("auth-token");
+/* Define a altura mínima da página e a cor de fundo geral */
+body {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  overflow-x: hidden;
+}
 
-  if (!loginForm || !emailInput || !senhaInput || !loginMessage || !authTokenInput) {
-    return;
+/* Classe usada quando o menu mobile estiver aberto */
+body.menu-mobile-open {
+  overflow: hidden;
+}
+
+/* Cria o visual padrão das caixas de conteúdo */
+.app-box {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Mantém o mapa superior com aparência limpa */
+.site-map-top {
+  background-color: #ffffff;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* Mantém o mapa inferior com aparência limpa */
+.site-map-bottom {
+  background-color: #ffffff;
+  border-top: 1px solid #dee2e6;
+}
+
+/* Estrutura fixa do menu lateral esquerdo.
+   Largura restrita à faixa sensível. */
+.site-map-left {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 100vh;
+  z-index: 1040;
+}
+
+/* Área invisível que detecta a passagem do mouse */
+.site-map-left-hover-area {
+  width: 16px;
+  height: 100%;
+}
+
+/* Conteúdo lateral começa escondido fora da tela */
+.site-map-left-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 220px;
+  max-width: 85vw;
+  height: 100vh;
+  overflow-y: auto;
+  background-color: #ffffff;
+  border-right: 1px solid #dee2e6;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+}
+
+/* Só abre por hover em dispositivos com mouse real */
+@media (hover: hover) and (pointer: fine) {
+  .site-map-left:hover .site-map-left-content {
+    transform: translateX(0);
+  }
+}
+
+/* Estado de abertura controlado por classe.
+   Permite integração com botão hambúrguer via JavaScript. */
+.site-map-left.is-open .site-map-left-content,
+.site-map-left.menu-open .site-map-left-content,
+.site-map-left-content.is-open {
+  transform: translateX(0);
+}
+
+/* Fundo escurecido para menu mobile */
+.menu-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 1039;
+}
+
+/* Melhora a visualização da tabela em telas pequenas */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Dá melhor alinhamento visual aos campos do modal */
+.modal .form-label {
+  font-weight: 500;
+}
+
+/* Barra de ações da página: filtros, ordenação e busca */
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.toolbar-actions .form-group,
+.toolbar-actions .form-floating,
+.toolbar-actions .input-group {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.toolbar-actions .toolbar-button {
+  flex: 0 0 auto;
+}
+
+/* Resumo de filtros ativos */
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.filter-summary:empty {
+  display: none;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 999px;
+  background-color: #f8f9fa;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.filter-chip button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* Select preparado para categorias dinâmicas */
+.select-categoria-dinamica {
+  min-width: 180px;
+}
+
+/* Cabeçalhos clicáveis para ordenação */
+.sortable-header {
+  user-select: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sortable-header:hover {
+  background-color: #f8f9fa;
+}
+
+.sortable-header .sort-indicator {
+  display: inline-block;
+  min-width: 14px;
+  margin-left: 4px;
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+/* Estados visuais de linha */
+.item-row {
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Destaca itens com quantidade 0 */
+.status-danger td,
+.item-row.is-zero td {
+  background-color: #f8d7da;
+}
+
+/* Destaca itens com quantidade baixa */
+.item-row.is-baixo td {
+  background-color: #fff3cd;
+}
+
+/* Destaca itens já marcados como comprados */
+.item-row.is-comprado {
+  background-color: #f1f8f4;
+}
+
+.item-row.is-comprado td {
+  color: #6c757d;
+}
+
+.item-row.is-comprado .item-nome,
+.item-row.is-comprado .item-categoria,
+.item-row.is-comprado .item-quantidade {
+  text-decoration: line-through;
+}
+
+/* Mantido por compatibilidade */
+.status-location-empty td {
+  background-color: #f8d7da;
+}
+
+/* Checkbox Comprar */
+.checkbox-comprar {
+  cursor: pointer;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.checkbox-comprar:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Alinhamento consistente de células */
+.cell-acoes,
+.cell-quantidade,
+.cell-checkbox,
+.cell-status {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cell-quantidade,
+.cell-checkbox,
+.cell-status {
+  text-align: center;
+}
+
+/* Campo de quantidade */
+.campo-quantidade {
+  min-width: 90px;
+}
+
+/* Badge de categoria */
+.badge-categoria {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+/* Estado vazio */
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: #6c757d;
+}
+
+.hidden-row {
+  display: none !important;
+}
+
+/* Espaçamento entre seções */
+.form-section + .form-section {
+  margin-top: 16px;
+}
+
+/* Ajustes para mobile */
+@media (max-width: 991.98px) {
+  .site-map-left {
+    width: 0;
+    overflow: visible;
   }
 
-  loginForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-    limparMensagemLogin();
-
-    const email = emailInput.value.trim();
-    const senha = senhaInput.value.trim();
-
-    if (!email || !senha) {
-      exibirMensagemLogin("Preencha e-mail e senha.");
-      return;
-    }
-
-    if (!validarEmail(email)) {
-      exibirMensagemLogin("Digite um e-mail válido.");
-      return;
-    }
-
-    processarLogin(email, senha);
-  });
-
-  function processarLogin(email, senha) {
-    const loginSucesso = Boolean(email && senha);
-
-    if (loginSucesso) {
-      authTokenInput.value = "";
-      window.location.href = "homepage.html";
-      return;
-    }
-
-    exibirMensagemLogin("E-mail ou senha inválidos.");
+  .site-map-left-hover-area {
+    display: none;
   }
 
-  function validarEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  .site-map-left-content {
+    position: fixed;
+    width: 260px;
+    max-width: 85vw;
+    z-index: 1041;
   }
 
-  function exibirMensagemLogin(mensagem) {
-    loginMessage.textContent = mensagem;
+  .app-box {
+    padding: 18px;
   }
 
-  function limparMensagemLogin() {
-    loginMessage.textContent = "";
+  .toolbar-actions {
+    gap: 10px;
   }
-});
+
+  .toolbar-actions .form-group,
+  .toolbar-actions .form-floating,
+  .toolbar-actions .input-group {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+}
+
+/* Ajustes extras para telas muito pequenas */
+@media (max-width: 575.98px) {
+  .app-box {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .site-map-left-content {
+    width: 240px;
+    max-width: 88vw;
+  }
+
+  .campo-quantidade {
+    min-width: 72px;
+  }
+
+  .filter-chip {
+    font-size: 0.8rem;
+  }
+
+  .sortable-header .sort-indicator {
+    margin-left: 2px;
+  }
+}
