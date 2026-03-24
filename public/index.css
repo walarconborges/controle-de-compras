@@ -1,0 +1,29 @@
+body {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  overflow-x: hidden;
+}
+
+.app-box {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+#login-message:empty {
+  display: none;
+}
+
+.form-control:focus,
+.btn:focus {
+  box-shadow: none;
+}
+
+@media (max-width: 575.98px) {
+  .app-box {
+    padding: 16px;
+    border-radius: 10px;
+  }
+}
