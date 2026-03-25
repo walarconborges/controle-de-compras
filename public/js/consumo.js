@@ -1,3 +1,10 @@
+import { apiGet, apiPost, apiPatch, apiDelete, readJsonSafe as lerJsonSeguro } from "./api.js";
+import { ensureAcceptedSession } from "./auth.js";
+import { setupMobileMenu } from "./dom.js";
+import { compareText, compareNumber, normalizeText, normalizeCategoryName, normalizeNumber, formatNumber, formatCurrency, formatDate, formatFieldValue } from "./formatters.js";
+import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
+import { ensureArray, extractListFromResponse, renderFilterSummary, updateCountLabel } from "./filters.js";
+
 document.addEventListener("DOMContentLoaded", function () {
   const visualizacaoConsumo = document.getElementById("visualizacao-consumo");
   const visualizacaoCompras = document.getElementById("visualizacao-compras");
@@ -37,7 +44,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let historicoCompras = [];
   let movimentacoesEstoque = [];
-  let ultimoElementoFocado = null;
 
   const filtrosConsumo = {
     item: "",
@@ -89,7 +95,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function configurarEventos() {
-    configurarMenuMobile();
+    setupMobileMenu({
+      menu,
+      menuContent,
+      btnOpen: btnAbrirMenu,
+      btnClose: btnFecharMenu,
+      backdrop
+    });
     configurarTabs();
 
     visualizacaoConsumo.addEventListener("change", renderizarConsumo);
@@ -191,131 +203,31 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  function configurarMenuMobile() {
-    if (!menu || !menuContent || !backdrop) {
-      return;
-    }
-
-    function abrirMenu() {
-      ultimoElementoFocado = document.activeElement;
-      menu.classList.add("is-open");
-      menuContent.classList.add("is-open");
-      menu.setAttribute("aria-hidden", "false");
-      backdrop.hidden = false;
-
-      if (btnAbrirMenu) {
-        btnAbrirMenu.setAttribute("aria-expanded", "true");
-      }
-
-      document.body.classList.add("menu-mobile-open");
-      menuContent.focus();
-    }
-
-    function fecharMenu() {
-      menu.classList.remove("is-open");
-      menuContent.classList.remove("is-open");
-      menu.setAttribute("aria-hidden", "true");
-      backdrop.hidden = true;
-
-      if (btnAbrirMenu) {
-        btnAbrirMenu.setAttribute("aria-expanded", "false");
-      }
-
-      document.body.classList.remove("menu-mobile-open");
-
-      if (ultimoElementoFocado && typeof ultimoElementoFocado.focus === "function") {
-        ultimoElementoFocado.focus();
-      }
-    }
-
-    if (btnAbrirMenu) {
-      btnAbrirMenu.addEventListener("click", abrirMenu);
-    }
-
-    if (btnFecharMenu) {
-      btnFecharMenu.addEventListener("click", fecharMenu);
-    }
-
-    backdrop.addEventListener("click", fecharMenu);
-
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        fecharMenu();
-      }
-    });
-
-    window.addEventListener("resize", function () {
-      if (window.innerWidth >= 992) {
-        fecharMenu();
-      }
-    });
-  }
 
   async function verificarSessao() {
-    try {
-      const resposta = await fetch("/sessao", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json"
-        }
-      });
-
-      if (!resposta.ok) {
-        window.location.replace("index.html");
-        throw new Error("Sessão não encontrada");
-      }
-
-      const dados = await lerJsonSeguro(resposta);
-
-      if (!dados.usuario) {
-        window.location.replace("index.html");
-        throw new Error("Usuário não encontrado na sessão");
-      }
-
-      const statusGrupo = String(dados.usuario.statusGrupo || "").toLowerCase();
-      if (statusGrupo && statusGrupo !== "aceito") {
-        window.location.replace("aguardando.html");
-        throw new Error("Usuário ainda não foi aceito no grupo");
-      }
-    } catch (error) {
-      if (!String(error.message || "").includes("aceito no grupo")) {
-        window.location.replace("index.html");
-      }
-      throw error;
-    }
+    await ensureAcceptedSession();
   }
 
   async function carregarDados() {
     const [respostaCompras, respostaMovimentacoes] = await Promise.all([
-      fetch("/compras", {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      }).catch(function () { return null; }),
-      fetch("/movimentacoes-estoque", {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      }).catch(function () { return null; })
+      apiGet("/compras").catch(function () { return null; }),
+      apiGet("/movimentacoes-estoque").catch(function () { return null; })
     ]);
 
-    if (respostaCompras && respostaCompras.ok) {
-      const dadosCompras = await lerJsonSeguro(respostaCompras);
-      historicoCompras = normalizarCompras(extrairListaResposta(dadosCompras));
+    if (respostaCompras && respostaCompras.response.ok) {
+      historicoCompras = normalizarCompras(extractListFromResponse(respostaCompras.data, ["data", "items", "resultado", "resultados", "compras", "registros", "lista"]));
     } else {
       historicoCompras = [];
     }
 
-    if (respostaMovimentacoes && respostaMovimentacoes.ok) {
-      const dadosMovimentacoes = await lerJsonSeguro(respostaMovimentacoes);
-      movimentacoesEstoque = normalizarMovimentacoes(extrairListaResposta(dadosMovimentacoes));
+    if (respostaMovimentacoes && respostaMovimentacoes.response.ok) {
+      movimentacoesEstoque = normalizarMovimentacoes(extractListFromResponse(respostaMovimentacoes.data, ["data", "items", "resultado", "resultados", "movimentacoes", "movimentacoesEstoque", "registros", "lista"]));
     } else {
       movimentacoesEstoque = [];
     }
   }
 
-  function extrairListaResposta(payload) {
+  function extractListFromResponse(payload) {
     if (Array.isArray(payload)) {
       return payload;
     }
@@ -367,7 +279,7 @@ document.addEventListener("DOMContentLoaded", function () {
             ""
           ).trim();
 
-          const categoria = normalizarNomeCategoria(
+          const categoria = normalizeCategoryName(
             item.categoria ||
             item.item?.categoria?.nome ||
             item.grupoItem?.item?.categoria?.nome ||
@@ -427,7 +339,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ""
       ).trim();
 
-      const categoria = normalizarNomeCategoria(
+      const categoria = normalizeCategoryName(
         mov.item?.categoria?.nome ||
         mov.categoria ||
         mov.categoriaNome ||
@@ -489,7 +401,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const conjunto = new Set();
 
     movimentacoesEstoque.forEach(function (mov) {
-      const categoria = normalizarNomeCategoria(mov.categoria || "");
+      const categoria = normalizeCategoryName(mov.categoria || "");
       if (categoria) {
         conjunto.add(categoria);
       }
@@ -498,7 +410,7 @@ document.addEventListener("DOMContentLoaded", function () {
     historicoCompras.forEach(function (compra) {
       const itens = Array.isArray(compra.itens) ? compra.itens : [];
       itens.forEach(function (item) {
-        const categoria = normalizarNomeCategoria(item.categoria || "");
+        const categoria = normalizeCategoryName(item.categoria || "");
         if (categoria) {
           conjunto.add(categoria);
         }
@@ -524,7 +436,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     const existe = Array.from(selectElement.options).some(function (option) {
-      return normalizarTexto(option.value) === normalizarTexto(valorAnterior);
+      return normalizeText(option.value) === normalizeText(valorAnterior);
     });
 
     selectElement.value = existe ? valorAnterior : "";
@@ -649,7 +561,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       itens.forEach(function (item) {
         const nome = String(item.nome || "").trim();
-        const categoria = normalizarNomeCategoria(item.categoria || "");
+        const categoria = normalizeCategoryName(item.categoria || "");
         const quantidade = Number(item.quantidade) || 0;
         const subtotal = Number(item.subtotal);
         const valorUnitario = Number(item.valorUnitario) || 0;
@@ -659,7 +571,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
 
-        const chave = `${normalizarTexto(nome)}||${normalizarTexto(categoria)}`;
+        const chave = `${normalizeText(nome)}||${normalizeText(categoria)}`;
 
         if (!grupos[chave]) {
           grupos[chave] = {
@@ -708,11 +620,11 @@ document.addEventListener("DOMContentLoaded", function () {
     return lista.filter(function (item) {
       const correspondeItem =
         !filtrosMediaCompras.item ||
-        normalizarTexto(item.nome).includes(normalizarTexto(filtrosMediaCompras.item));
+        normalizeText(item.nome).includes(normalizeText(filtrosMediaCompras.item));
 
       const correspondeCategoria =
         !filtrosMediaCompras.categoria ||
-        normalizarTexto(item.categoria) === normalizarTexto(filtrosMediaCompras.categoria);
+        normalizeText(item.categoria) === normalizeText(filtrosMediaCompras.categoria);
 
       return correspondeItem && correspondeCategoria;
     });
@@ -721,15 +633,15 @@ document.addEventListener("DOMContentLoaded", function () {
   function aplicarFiltrosMovimentacoesConsumo(lista) {
     return lista.filter(function (mov) {
       const nome = String(mov.nome || "").trim();
-      const categoria = normalizarNomeCategoria(mov.categoria || "");
+      const categoria = normalizeCategoryName(mov.categoria || "");
 
       const correspondeItem =
         !filtrosConsumo.item ||
-        normalizarTexto(nome).includes(normalizarTexto(filtrosConsumo.item));
+        normalizeText(nome).includes(normalizeText(filtrosConsumo.item));
 
       const correspondeCategoria =
         !filtrosConsumo.categoria ||
-        normalizarTexto(categoria) === normalizarTexto(filtrosConsumo.categoria);
+        normalizeText(categoria) === normalizeText(filtrosConsumo.categoria);
 
       return correspondeItem && correspondeCategoria;
     });
@@ -747,7 +659,7 @@ document.addEventListener("DOMContentLoaded", function () {
     consumos.forEach(function (mov) {
       const dataMov = new Date(mov.data);
       const consumo = Math.abs(Number(mov.variacao));
-      const categoria = normalizarNomeCategoria(mov.categoria || "");
+      const categoria = normalizeCategoryName(mov.categoria || "");
 
       if (isNaN(dataMov.getTime()) || Number.isNaN(consumo)) {
         return;
@@ -760,7 +672,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (agrupamento === "categoria") {
         nomeExibicao = categoria || "Sem categoria";
-        chave = normalizarTexto(nomeExibicao);
+        chave = normalizeText(nomeExibicao);
       } else {
         const nomeItem = String(mov.nome || "").trim();
         const unidadeItem = String(mov.unidade || "").trim();
@@ -771,7 +683,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         nomeExibicao = nomeItem;
         unidadeExibicao = unidadeItem;
-        chave = `${normalizarTexto(nomeExibicao)}||${normalizarTexto(unidadeExibicao)}||${normalizarTexto(categoriaExibicao)}`;
+        chave = `${normalizeText(nomeExibicao)}||${normalizeText(unidadeExibicao)}||${normalizeText(categoriaExibicao)}`;
       }
 
       if (!grupos[chave]) {
@@ -825,15 +737,15 @@ document.addEventListener("DOMContentLoaded", function () {
       let comparacao = 0;
 
       if (ordenacaoAtualConsumo.campo === "item") {
-        comparacao = compararTexto(a.nome, b.nome);
+        comparacao = compareText(a.nome, b.nome);
       } else if (ordenacaoAtualConsumo.campo === "categoria") {
-        comparacao = compararTexto(a.categoria || a.nome, b.categoria || b.nome);
+        comparacao = compareText(a.categoria || a.nome, b.categoria || b.nome);
       } else if (ordenacaoAtualConsumo.campo === "quantidade") {
-        comparacao = compararNumero(a.consumoTotal, b.consumoTotal);
+        comparacao = compareNumber(a.consumoTotal, b.consumoTotal);
       }
 
       if (comparacao === 0) {
-        comparacao = compararTexto(a.nome, b.nome);
+        comparacao = compareText(a.nome, b.nome);
       }
 
       return ordenacaoAtualConsumo.direcao === "desc" ? comparacao * -1 : comparacao;
@@ -849,15 +761,15 @@ document.addEventListener("DOMContentLoaded", function () {
       let comparacao = 0;
 
       if (ordenacaoAtualMediaCompras.campo === "item") {
-        comparacao = compararTexto(a.nome, b.nome);
+        comparacao = compareText(a.nome, b.nome);
       } else if (ordenacaoAtualMediaCompras.campo === "categoria") {
-        comparacao = compararTexto(a.categoria, b.categoria);
+        comparacao = compareText(a.categoria, b.categoria);
       } else if (ordenacaoAtualMediaCompras.campo === "quantidade") {
-        comparacao = compararNumero(a.quantidadeItens, b.quantidadeItens);
+        comparacao = compareNumber(a.quantidadeItens, b.quantidadeItens);
       }
 
       if (comparacao === 0) {
-        comparacao = compararTexto(a.nome, b.nome);
+        comparacao = compareText(a.nome, b.nome);
       }
 
       return ordenacaoAtualMediaCompras.direcao === "desc" ? comparacao * -1 : comparacao;
@@ -897,17 +809,17 @@ document.addEventListener("DOMContentLoaded", function () {
         ? templateLinhaMediaCompras.content.firstElementChild.cloneNode(true)
         : document.createElement("tr");
 
-      linha.dataset.item = normalizarTexto(grupo.nome);
-      linha.dataset.categoria = normalizarTexto(grupo.categoria);
+      linha.dataset.item = normalizeText(grupo.nome);
+      linha.dataset.categoria = normalizeText(grupo.categoria);
       linha.dataset.quantidade = String(Number(grupo.quantidadeItens) || 0);
 
       preencherCelula(linha, ".item-nome", grupo.nome);
       preencherCelula(linha, ".item-categoria", grupo.categoria || "Sem categoria");
-      preencherCelula(linha, ".item-data-compra", formatarData(grupo.ultimaCompra));
-      preencherCelula(linha, ".item-quantidade", formatarNumero(grupo.quantidadeItens));
-      preencherCelula(linha, ".item-media-compra", formatarMoeda(grupo.mediaPorCompra));
-      preencherCelula(linha, ".item-media-item", formatarMoeda(grupo.mediaPorItem));
-      preencherCelula(linha, ".item-total-acumulado", formatarMoeda(grupo.totalAcumulado));
+      preencherCelula(linha, ".item-data-compra", formatDate(grupo.ultimaCompra));
+      preencherCelula(linha, ".item-quantidade", formatNumber(grupo.quantidadeItens));
+      preencherCelula(linha, ".item-media-compra", formatCurrency(grupo.mediaPorCompra));
+      preencherCelula(linha, ".item-media-item", formatCurrency(grupo.mediaPorItem));
+      preencherCelula(linha, ".item-total-acumulado", formatCurrency(grupo.totalAcumulado));
 
       tbody.appendChild(linha);
     });
@@ -933,11 +845,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
       item.appendChild(criarBlocoTexto("fw-semibold", grupo.nome));
       item.appendChild(criarBlocoTexto("small text-muted", grupo.categoria || "Sem categoria"));
-      item.appendChild(criarBlocoTexto("small", `Última compra: ${formatarData(grupo.ultimaCompra)}`));
-      item.appendChild(criarBlocoTexto("small", `Quantidade de itens: ${formatarNumero(grupo.quantidadeItens)}`));
-      item.appendChild(criarBlocoTexto("small", `Média por compra: ${formatarMoeda(grupo.mediaPorCompra)}`));
-      item.appendChild(criarBlocoTexto("small", `Média por item: ${formatarMoeda(grupo.mediaPorItem)}`));
-      item.appendChild(criarBlocoTexto("small", `Total acumulado: ${formatarMoeda(grupo.totalAcumulado)}`));
+      item.appendChild(criarBlocoTexto("small", `Última compra: ${formatDate(grupo.ultimaCompra)}`));
+      item.appendChild(criarBlocoTexto("small", `Quantidade de itens: ${formatNumber(grupo.quantidadeItens)}`));
+      item.appendChild(criarBlocoTexto("small", `Média por compra: ${formatCurrency(grupo.mediaPorCompra)}`));
+      item.appendChild(criarBlocoTexto("small", `Média por item: ${formatCurrency(grupo.mediaPorItem)}`));
+      item.appendChild(criarBlocoTexto("small", `Total acumulado: ${formatCurrency(grupo.totalAcumulado)}`));
 
       lista.appendChild(item);
     });
@@ -1043,7 +955,7 @@ document.addEventListener("DOMContentLoaded", function () {
       type: "line",
       data: {
         labels: ordenadosPorData.map(function (item) {
-          return formatarData(item.ultimaCompra);
+          return formatDate(item.ultimaCompra);
         }),
         datasets: [
           {
@@ -1096,19 +1008,19 @@ document.addEventListener("DOMContentLoaded", function () {
         ? templateLinhaConsumo.content.firstElementChild.cloneNode(true)
         : document.createElement("tr");
 
-      linha.dataset.item = normalizarTexto(grupo.nome);
-      linha.dataset.categoria = normalizarTexto(grupo.categoria);
+      linha.dataset.item = normalizeText(grupo.nome);
+      linha.dataset.categoria = normalizeText(grupo.categoria);
       linha.dataset.quantidade = String(Number(grupo.consumoTotal) || 0);
 
       preencherCelula(linha, ".item-nome", grupo.nome);
       preencherCelula(linha, ".item-unidade", grupo.unidade || "-");
       preencherCelula(linha, ".item-categoria", grupo.categoria || "Sem categoria");
-      preencherCelula(linha, ".item-data-inicial", formatarData(grupo.dataInicial));
-      preencherCelula(linha, ".item-data-final", formatarData(grupo.dataFinal));
-      preencherCelula(linha, ".item-dias-periodo", formatarNumero(grupo.diasNoPeriodo));
-      preencherCelula(linha, ".item-quantidade", formatarNumero(grupo.consumoTotal));
-      preencherCelula(linha, ".item-media-diaria", formatarNumero(grupo.mediaDiaria));
-      preencherCelula(linha, ".item-ocorrencias", formatarNumero(grupo.ocorrencias));
+      preencherCelula(linha, ".item-data-inicial", formatDate(grupo.dataInicial));
+      preencherCelula(linha, ".item-data-final", formatDate(grupo.dataFinal));
+      preencherCelula(linha, ".item-dias-periodo", formatNumber(grupo.diasNoPeriodo));
+      preencherCelula(linha, ".item-quantidade", formatNumber(grupo.consumoTotal));
+      preencherCelula(linha, ".item-media-diaria", formatNumber(grupo.mediaDiaria));
+      preencherCelula(linha, ".item-ocorrencias", formatNumber(grupo.ocorrencias));
 
       tbody.appendChild(linha);
     });
@@ -1139,11 +1051,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       item.appendChild(criarBlocoTexto("small text-muted", grupo.categoria || "Sem categoria"));
-      item.appendChild(criarBlocoTexto("small", `Período: ${formatarData(grupo.dataInicial)} até ${formatarData(grupo.dataFinal)}`));
-      item.appendChild(criarBlocoTexto("small", `Dias no período: ${formatarNumero(grupo.diasNoPeriodo)}`));
-      item.appendChild(criarBlocoTexto("small", `Consumo total: ${formatarNumero(grupo.consumoTotal)}`));
-      item.appendChild(criarBlocoTexto("small", `Média diária: ${formatarNumero(grupo.mediaDiaria)}`));
-      item.appendChild(criarBlocoTexto("small", `Ocorrências: ${formatarNumero(grupo.ocorrencias)}`));
+      item.appendChild(criarBlocoTexto("small", `Período: ${formatDate(grupo.dataInicial)} até ${formatDate(grupo.dataFinal)}`));
+      item.appendChild(criarBlocoTexto("small", `Dias no período: ${formatNumber(grupo.diasNoPeriodo)}`));
+      item.appendChild(criarBlocoTexto("small", `Consumo total: ${formatNumber(grupo.consumoTotal)}`));
+      item.appendChild(criarBlocoTexto("small", `Média diária: ${formatNumber(grupo.mediaDiaria)}`));
+      item.appendChild(criarBlocoTexto("small", `Ocorrências: ${formatNumber(grupo.ocorrencias)}`));
 
       lista.appendChild(item);
     });
@@ -1213,7 +1125,7 @@ document.addEventListener("DOMContentLoaded", function () {
       type: "line",
       data: {
         labels: ordenadosPorData.map(function (item) {
-          return formatarData(item.dataFinal);
+          return formatDate(item.dataFinal);
         }),
         datasets: [
           {
@@ -1435,120 +1347,74 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function atualizarResumoFiltrosConsumo() {
-    atualizarResumoFiltros(
-      resumoFiltrosConsumo,
-      filtrosConsumo,
-      [
-        {
-          label: "Item",
-          value: filtrosConsumo.item,
-          onRemove: function () {
-            filtrosConsumo.item = "";
-            if (filtroItemConsumo) {
-              filtroItemConsumo.value = "";
-            }
-            renderizarConsumo();
+    renderFilterSummary(resumoFiltrosConsumo, [
+      {
+        label: "Item",
+        value: filtrosConsumo.item,
+        onRemove: function () {
+          filtrosConsumo.item = "";
+          if (filtroItemConsumo) {
+            filtroItemConsumo.value = "";
           }
-        },
-        {
-          label: "Categoria",
-          value: filtrosConsumo.categoria,
-          onRemove: function () {
-            filtrosConsumo.categoria = "";
-            if (filtroCategoriaConsumo) {
-              filtroCategoriaConsumo.value = "";
-            }
-            renderizarConsumo();
-          }
+          renderizarConsumo();
         }
-      ]
-    );
+      },
+      {
+        label: "Categoria",
+        value: filtrosConsumo.categoria,
+        onRemove: function () {
+          filtrosConsumo.categoria = "";
+          if (filtroCategoriaConsumo) {
+            filtroCategoriaConsumo.value = "";
+          }
+          renderizarConsumo();
+        }
+      }
+    ]);
   }
 
   function atualizarResumoFiltrosMediaCompras() {
-    atualizarResumoFiltros(
-      resumoFiltrosMediaCompras,
-      filtrosMediaCompras,
-      [
-        {
-          label: "Item",
-          value: filtrosMediaCompras.item,
-          onRemove: function () {
-            filtrosMediaCompras.item = "";
-            if (filtroItemMediaCompras) {
-              filtroItemMediaCompras.value = "";
-            }
-            renderizarCompras();
+    renderFilterSummary(resumoFiltrosMediaCompras, [
+      {
+        label: "Item",
+        value: filtrosMediaCompras.item,
+        onRemove: function () {
+          filtrosMediaCompras.item = "";
+          if (filtroItemMediaCompras) {
+            filtroItemMediaCompras.value = "";
           }
-        },
-        {
-          label: "Categoria",
-          value: filtrosMediaCompras.categoria,
-          onRemove: function () {
-            filtrosMediaCompras.categoria = "";
-            if (filtroCategoriaMediaCompras) {
-              filtroCategoriaMediaCompras.value = "";
-            }
-            renderizarCompras();
-          }
+          renderizarCompras();
         }
-      ]
-    );
-  }
-
-  function atualizarResumoFiltros(container, estado, definicoes) {
-    if (!container) {
-      return;
-    }
-
-    container.textContent = "";
-
-    definicoes.forEach(function (definicao) {
-      if (!definicao.value) {
-        return;
+      },
+      {
+        label: "Categoria",
+        value: filtrosMediaCompras.categoria,
+        onRemove: function () {
+          filtrosMediaCompras.categoria = "";
+          if (filtroCategoriaMediaCompras) {
+            filtroCategoriaMediaCompras.value = "";
+          }
+          renderizarCompras();
+        }
       }
-
-      container.appendChild(criarChipFiltro(`${definicao.label}: ${definicao.value}`, definicao.onRemove));
-    });
-  }
-
-  function criarChipFiltro(texto, onRemove) {
-    const chip = document.createElement("span");
-    chip.className = "filter-chip";
-
-    const spanTexto = document.createElement("span");
-    spanTexto.textContent = texto;
-
-    const botao = document.createElement("button");
-    botao.type = "button";
-    botao.setAttribute("aria-label", "Remover filtro");
-    botao.textContent = "×";
-    botao.addEventListener("click", onRemove);
-
-    chip.appendChild(spanTexto);
-    chip.appendChild(botao);
-    return chip;
+    ]);
   }
 
   function atualizarContador(elemento, quantidade, sufixo) {
-    if (!elemento) {
-      return;
-    }
-
-    elemento.textContent = `${quantidade} ${sufixo}`;
+    updateCountLabel(elemento, quantidade, sufixo);
   }
 
-  function compararTexto(a, b) {
+  function compareText(a, b) {
     return String(a || "").localeCompare(String(b || ""), "pt-BR", {
       sensitivity: "base"
     });
   }
 
-  function compararNumero(a, b) {
+  function compareNumber(a, b) {
     return Number(a || 0) - Number(b || 0);
   }
 
-  function normalizarTexto(valor) {
+  function normalizeText(valor) {
     return String(valor || "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -1556,11 +1422,11 @@ document.addEventListener("DOMContentLoaded", function () {
       .toLowerCase();
   }
 
-  function normalizarNomeCategoria(valor) {
+  function normalizeCategoryName(valor) {
     return String(valor || "").trim().replace(/\s+/g, " ");
   }
 
-  function formatarData(valor) {
+  function formatDate(valor) {
     const data = new Date(valor);
 
     if (isNaN(data.getTime())) {
@@ -1570,25 +1436,18 @@ document.addEventListener("DOMContentLoaded", function () {
     return data.toLocaleDateString("pt-BR");
   }
 
-  function formatarNumero(valor) {
+  function formatNumber(valor) {
     return Number(valor || 0).toLocaleString("pt-BR", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     });
   }
 
-  function formatarMoeda(valor) {
+  function formatCurrency(valor) {
     return Number(valor || 0).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL"
     });
   }
 
-  async function lerJsonSeguro(resposta) {
-    try {
-      return await resposta.json();
-    } catch {
-      return {};
-    }
-  }
 });

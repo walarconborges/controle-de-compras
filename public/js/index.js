@@ -1,3 +1,8 @@
+import { apiGet, apiPost } from "./api.js";
+import { redirectIfSessionExists } from "./auth.js";
+import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
+import { isValidEmail, normalizeSingleWord } from "./validators.js";
+
 document.addEventListener("DOMContentLoaded", function () {
   const loginForm = document.getElementById("login-form");
   const emailInput = document.getElementById("email");
@@ -28,7 +33,7 @@ document.addEventListener("DOMContentLoaded", function () {
     return;
   }
 
-  verificarSessaoAtual();
+  redirectIfSessionExists();
 
   loginForm.addEventListener("submit", async function (event) {
     event.preventDefault();
@@ -60,7 +65,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (cadastroGrupoInput) {
     cadastroGrupoInput.addEventListener("input", function () {
-      const termo = normalizarGrupoDigitado(cadastroGrupoInput.value);
+      const termo = normalizeSingleWord(cadastroGrupoInput.value);
       cadastroGrupoInput.value = termo;
       buscarSugestoesGrupo(termo);
     });
@@ -70,7 +75,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     cadastroGrupoInput.addEventListener("focus", function () {
-      const termo = normalizarGrupoDigitado(cadastroGrupoInput.value);
+      const termo = normalizeSingleWord(cadastroGrupoInput.value);
       if (termo.length >= 2) {
         buscarSugestoesGrupo(termo);
       }
@@ -86,7 +91,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const sobrenome = cadastroSobrenomeInput.value.trim();
       const email = cadastroEmailInput.value.trim();
       const senha = cadastroSenhaInput.value;
-      const grupoNome = normalizarGrupoDigitado(cadastroGrupoInput.value);
+      const grupoNome = normalizeSingleWord(cadastroGrupoInput.value);
       cadastroGrupoInput.value = grupoNome;
 
       if (!nome) {
@@ -150,45 +155,11 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  async function verificarSessaoAtual() {
-    try {
-      const resposta = await fetch("/sessao", {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      });
-
-      if (!resposta.ok) {
-        return;
-      }
-
-      const dados = await lerJsonSeguro(resposta);
-      if (!dados || !dados.usuario) {
-        return;
-      }
-
-      const destino = dados.usuario.statusGrupo === "aceito" ? "homepage.html" : "aguardando.html";
-      window.location.replace(destino);
-    } catch (error) {
-      console.error("Erro ao verificar sessão atual:", error);
-    }
-  }
-
   async function processarLogin(email, senha) {
     try {
       definirEstadoLogin(true);
 
-      const resposta = await fetch("/login", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json"
-        },
-        body: JSON.stringify({ email, senha })
-      });
-
-      const dados = await lerJsonSeguro(resposta);
+      const { response: resposta, data: dados } = await apiPost("/login", { email, senha });
 
       if (!resposta.ok) {
         exibirMensagemLogin(dados.erro || "Não foi possível entrar.", "danger");
@@ -216,17 +187,7 @@ document.addEventListener("DOMContentLoaded", function () {
     try {
       definirEstadoCadastro(true);
 
-      const resposta = await fetch("/cadastro", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const dados = await lerJsonSeguro(resposta);
+      const { response: resposta, data: dados } = await apiPost("/cadastro", payload);
 
       if (!resposta.ok) {
         exibirMensagemCadastro(dados.erro || "Não foi possível criar a conta.", "danger");
@@ -271,19 +232,13 @@ document.addEventListener("DOMContentLoaded", function () {
     controladorSugestoes = new AbortController();
 
     try {
-      const resposta = await fetch(`/grupos/sugestoes?termo=${encodeURIComponent(termoLimpo)}`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" },
-        signal: controladorSugestoes.signal
-      });
+      const { response: resposta, data: dados } = await apiGet(`/grupos/sugestoes?termo=${encodeURIComponent(termoLimpo)}`, { signal: controladorSugestoes.signal });
 
       if (!resposta.ok) {
         esconderSugestoesGrupo();
         return;
       }
 
-      const dados = await lerJsonSeguro(resposta);
       if (termoLimpo !== ultimoTermoBuscado) {
         return;
       }
@@ -332,12 +287,6 @@ document.addEventListener("DOMContentLoaded", function () {
     cadastroSugestoesGrupo.innerHTML = "";
   }
 
-  function normalizarGrupoDigitado(valor) {
-    return String(valor || "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .split(" ")[0] || "";
-  }
 
   function definirEstadoLogin(ativo) {
     btnEntrar.disabled = Boolean(ativo);
@@ -352,38 +301,19 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function exibirMensagemLogin(texto, variante) {
-    loginMessage.className = `mb-3 small text-${variante}`;
-    loginMessage.textContent = texto;
+    setFeedbackMessage(loginMessage, texto, variante, { classeBase: "mb-3 small" });
   }
 
   function limparMensagemLogin() {
-    loginMessage.className = "mb-3 small";
-    loginMessage.textContent = "";
+    clearFeedbackMessage(loginMessage, { classeBase: "mb-3 small" });
   }
 
   function exibirMensagemCadastro(texto, variante) {
-    cadastroMessage.className = `small text-${variante}`;
-    cadastroMessage.textContent = texto;
+    setFeedbackMessage(cadastroMessage, texto, variante);
   }
 
   function limparMensagemCadastro() {
-    cadastroMessage.className = "small";
-    cadastroMessage.textContent = "";
+    clearFeedbackMessage(cadastroMessage);
   }
 
-  function validarEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ""));
-  }
-
-  async function lerJsonSeguro(resposta) {
-    const texto = await resposta.text();
-    if (!texto) {
-      return {};
-    }
-    try {
-      return JSON.parse(texto);
-    } catch (error) {
-      return {};
-    }
-  }
 });

@@ -1,3 +1,9 @@
+import { apiGet, apiPatch } from "./api.js";
+import { ensureAcceptedSession, logoutAndRedirect } from "./auth.js";
+import { escapeHtml } from "./dom.js";
+import { getFullName } from "./formatters.js";
+import { setFeedbackMessage } from "./messages.js";
+
 document.addEventListener("DOMContentLoaded", function () {
   const perfilDados = document.getElementById("perfil-dados");
   const perfilMembros = document.getElementById("perfil-membros");
@@ -16,7 +22,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function inicializar() {
     try {
-      const sessao = await verificarSessao();
+      const usuario = await ensureAcceptedSession();
+      const sessao = { usuario };
       papelAtual = String(sessao.usuario?.papel || "").toLowerCase();
       await carregarPerfil();
       await carregarMembros();
@@ -27,64 +34,25 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  async function verificarSessao() {
-    const resposta = await fetch("/sessao", {
-      method: "GET",
-      credentials: "include",
-      headers: { Accept: "application/json" }
-    });
-
-    if (!resposta.ok) {
-      window.location.replace("index.html");
-      throw new Error("Sessão não encontrada");
-    }
-
-    const dados = await lerJsonSeguro(resposta);
-    if (!dados.usuario) {
-      window.location.replace("index.html");
-      throw new Error("Usuário não encontrado na sessão");
-    }
-
-    const statusGrupo = String(dados.usuario.statusGrupo || "").toLowerCase();
-    if (statusGrupo && statusGrupo !== "aceito") {
-      window.location.replace("aguardando.html");
-      throw new Error("Usuário pendente");
-    }
-
-    return dados;
-  }
-
   async function carregarPerfil() {
-    const resposta = await fetch("/meu-perfil", {
-      method: "GET",
-      credentials: "include",
-      headers: { Accept: "application/json" }
-    });
-
-    const dados = await lerJsonSeguro(resposta);
+    const { response: resposta, data: dados } = await apiGet("/meu-perfil");
     if (!resposta.ok) {
       throw new Error(dados.erro || "Falha ao carregar perfil.");
     }
 
     const perfil = dados.usuario || dados;
     perfilDados.innerHTML = `
-      <div><strong>Nome:</strong> ${escapar(perfil.nome || "-")}</div>
-      <div><strong>E-mail:</strong> ${escapar(perfil.email || "-")}</div>
-      <div><strong>Grupo:</strong> ${escapar(perfil.grupoNome || "-")}</div>
-      <div><strong>Código do grupo:</strong> ${escapar(perfil.grupoCodigo || "-")}</div>
-      <div><strong>Papel:</strong> ${escapar(perfil.papel || "-")}</div>
-      <div><strong>Status:</strong> ${escapar(perfil.statusGrupo || "-")}</div>
+      <div><strong>Nome:</strong> ${escapeHtml(perfil.nome || "-")}</div>
+      <div><strong>E-mail:</strong> ${escapeHtml(perfil.email || "-")}</div>
+      <div><strong>Grupo:</strong> ${escapeHtml(perfil.grupoNome || "-")}</div>
+      <div><strong>Código do grupo:</strong> ${escapeHtml(perfil.grupoCodigo || "-")}</div>
+      <div><strong>Papel:</strong> ${escapeHtml(perfil.papel || "-")}</div>
+      <div><strong>Status:</strong> ${escapeHtml(perfil.statusGrupo || "-")}</div>
     `;
   }
 
   async function carregarMembros() {
-    const resposta = await fetch("/meu-grupo/membros", {
-      method: "GET",
-      credentials: "include",
-      headers: { Accept: "application/json" }
-    });
-
-    const dados = await lerJsonSeguro(resposta);
+    const { response: resposta, data: dados } = await apiGet("/meu-grupo/membros");
     if (!resposta.ok) {
       throw new Error(dados.erro || "Falha ao carregar membros.");
     }
@@ -100,29 +68,23 @@ document.addEventListener("DOMContentLoaded", function () {
     membros.forEach(function (membro) {
       const tr = document.createElement("tr");
       const usuario = membro.usuario || {};
-      const nome = obterNomeUsuario(usuario, membro);
+      const nome = getFullName(usuario, membro);
       const email = usuario.email || membro.email || "-";
       const papel = membro.papel || usuario.papel || "-";
       const status = membro.status || membro.statusGrupo || usuario.statusGrupo || "-";
 
       tr.innerHTML = `
-        <td>${escapar(nome)}</td>
-        <td>${escapar(email)}</td>
-        <td>${escapar(papel)}</td>
-        <td>${escapar(status)}</td>
+        <td>${escapeHtml(nome)}</td>
+        <td>${escapeHtml(email)}</td>
+        <td>${escapeHtml(papel)}</td>
+        <td>${escapeHtml(status)}</td>
       `;
       perfilMembros.appendChild(tr);
     });
   }
 
   async function carregarSolicitacoes() {
-    const resposta = await fetch("/meu-grupo/solicitacoes", {
-      method: "GET",
-      credentials: "include",
-      headers: { Accept: "application/json" }
-    });
-
-    const dados = await lerJsonSeguro(resposta);
+    const { response: resposta, data: dados } = await apiGet("/meu-grupo/solicitacoes");
 
     if (resposta.status === 403 || papelAtual !== "admin") {
       if (perfilAdminAviso) {
@@ -152,16 +114,16 @@ document.addEventListener("DOMContentLoaded", function () {
       const tr = document.createElement("tr");
       const usuario = solicitacao.usuario || {};
       const id = Number(solicitacao.id);
-      const nome = obterNomeUsuario(usuario, solicitacao);
+      const nome = getFullName(usuario, solicitacao);
       const email = usuario.email || solicitacao.email || "-";
       const papel = solicitacao.papel || usuario.papel || "membro";
       const status = solicitacao.status || solicitacao.statusGrupo || usuario.statusGrupo || "pendente";
 
       tr.innerHTML = `
-        <td>${escapar(nome)}</td>
-        <td>${escapar(email)}</td>
-        <td>${escapar(papel)}</td>
-        <td>${escapar(status)}</td>
+        <td>${escapeHtml(nome)}</td>
+        <td>${escapeHtml(email)}</td>
+        <td>${escapeHtml(papel)}</td>
+        <td>${escapeHtml(status)}</td>
         <td class="text-end">
           <div class="d-flex justify-content-end gap-2">
             <button type="button" class="btn btn-sm btn-success" data-acao="aceitar" data-id="${id}">Aceitar</button>
@@ -184,12 +146,7 @@ document.addEventListener("DOMContentLoaded", function () {
   async function decidirSolicitacao(id, acao) {
     try {
       exibirMensagem("Salvando decisão...", "muted");
-      const resposta = await fetch(`/meu-grupo/solicitacoes/${id}/${acao}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      });
-      const dados = await lerJsonSeguro(resposta);
+      const { response: resposta, data: dados } = await apiPatch(`/meu-grupo/solicitacoes/${id}/${acao}`);
       if (!resposta.ok) {
         throw new Error(dados.erro || `Falha ao ${acao} solicitação.`);
       }
@@ -203,59 +160,12 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function logout() {
-    try {
-      await fetch("/logout", {
-        method: "POST",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      });
-    } catch (error) {
-      console.error("Erro ao sair:", error);
-    } finally {
-      window.location.replace("index.html");
-    }
-  }
-
-  function obterNomeUsuario(usuario, fallback) {
-    const nomeCompletoUsuario = [usuario.nome, usuario.sobrenome]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-
-    if (nomeCompletoUsuario) {
-      return nomeCompletoUsuario;
-    }
-
-    const nomeCompletoFallback = [fallback?.nome, fallback?.sobrenome]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-
-    return nomeCompletoFallback || fallback?.nome || "-";
+    await logoutAndRedirect();
   }
 
   function exibirMensagem(texto, variante) {
     if (!perfilMessage) return;
-    perfilMessage.className = `small mt-3 text-${variante}`;
-    perfilMessage.textContent = texto;
+    setFeedbackMessage(perfilMessage, texto, variante, { classeBase: "small mt-3" });
   }
 
-  function escapar(valor) {
-    return String(valor || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  async function lerJsonSeguro(resposta) {
-    const texto = await resposta.text();
-    if (!texto) return {};
-    try {
-      return JSON.parse(texto);
-    } catch {
-      return {};
-    }
-  }
 });

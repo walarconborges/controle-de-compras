@@ -1,3 +1,7 @@
+import { apiGet } from "./api.js";
+import { logoutAndRedirect } from "./auth.js";
+import { setFeedbackMessage } from "./messages.js";
+
 document.addEventListener("DOMContentLoaded", function () {
   const info = document.getElementById("aguardando-info");
   const mensagem = document.getElementById("aguardando-message");
@@ -17,18 +21,13 @@ document.addEventListener("DOMContentLoaded", function () {
   async function verificarStatus() {
     try {
       exibirMensagem("Verificando status...", "muted");
-      const resposta = await fetch("/meu-status-grupo", {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      });
+      const { response: resposta, data: dados } = await apiGet("/meu-status-grupo");
 
       if (!resposta.ok) {
         window.location.replace("index.html");
         return;
       }
 
-      const dados = await lerJsonSeguro(resposta);
       const usuario = dados.usuario || dados;
       const status = String(usuario.statusGrupo || "").toLowerCase();
       const grupoNome = usuario.grupoNome || "-";
@@ -55,30 +54,14 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function logout() {
-    try {
-      await fetch("/logout", {
-        method: "POST",
-        credentials: "include",
-        headers: { Accept: "application/json" }
-      });
-    } catch (error) {
-      console.error("Erro ao sair:", error);
-    } finally {
-      window.location.replace("index.html");
-    }
+    await logoutAndRedirect();
   }
 
   function exibirMensagem(texto, variante) {
     if (!mensagem) {
       return;
     }
-    mensagem.className = `small mt-3 text-${variante}`;
-    mensagem.textContent = texto;
+    setFeedbackMessage(mensagem, texto, variante, { classeBase: "small mt-3" });
   }
 
-  async function lerJsonSeguro(resposta) {
-    const texto = await resposta.text();
-    if (!texto) return {};
-    try { return JSON.parse(texto); } catch { return {}; }
-  }
 });

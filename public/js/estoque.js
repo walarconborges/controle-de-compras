@@ -1,3 +1,10 @@
+import { apiGet, apiPost, apiPatch, apiDelete, readJsonSafe as lerJsonSeguro } from "./api.js";
+import { ensureAcceptedSession } from "./auth.js";
+import { setupMobileMenu } from "./dom.js";
+import { compareText, compareNumber, normalizeText, normalizeCategoryName, normalizeNumber, formatNumber, formatCurrency, formatDate, formatFieldValue } from "./formatters.js";
+import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
+import { ensureArray, extractListFromResponse, renderFilterSummary, updateCountLabel } from "./filters.js";
+
 document.addEventListener("DOMContentLoaded", function () {
   const estoqueForm = document.getElementById("estoque-form");
   const estoqueTabela = document.getElementById("estoque-tabela");
@@ -46,7 +53,6 @@ document.addEventListener("DOMContentLoaded", function () {
   let itensGlobais = [];
   let categoriasGlobais = [];
   let idEdicao = null;
-  let ultimoElementoFocado = null;
 
   const filtrosAtivos = {
     item: "",
@@ -89,7 +95,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function configurarEventos() {
-    configurarMenuMobile();
+    setupMobileMenu({
+      menu,
+      menuContent,
+      btnOpen: btnAbrirMenu,
+      btnClose: btnFecharMenu,
+      backdrop
+    });
 
     estoqueForm.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -171,123 +183,33 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function configurarMenuMobile() {
-    if (!menu || !menuContent || !backdrop) {
-      return;
-    }
-
-    function abrirMenu() {
-      ultimoElementoFocado = document.activeElement;
-      menu.classList.add("is-open");
-      menuContent.classList.add("is-open");
-      menu.setAttribute("aria-hidden", "false");
-      backdrop.hidden = false;
-
-      if (btnAbrirMenu) {
-        btnAbrirMenu.setAttribute("aria-expanded", "true");
-      }
-
-      document.body.classList.add("menu-mobile-open");
-      menuContent.focus();
-    }
-
-    function fecharMenu() {
-      menu.classList.remove("is-open");
-      menuContent.classList.remove("is-open");
-      menu.setAttribute("aria-hidden", "true");
-      backdrop.hidden = true;
-
-      if (btnAbrirMenu) {
-        btnAbrirMenu.setAttribute("aria-expanded", "false");
-      }
-
-      document.body.classList.remove("menu-mobile-open");
-
-      if (ultimoElementoFocado && typeof ultimoElementoFocado.focus === "function") {
-        ultimoElementoFocado.focus();
-      }
-    }
-
-    if (btnAbrirMenu) {
-      btnAbrirMenu.addEventListener("click", abrirMenu);
-    }
-
-    if (btnFecharMenu) {
-      btnFecharMenu.addEventListener("click", fecharMenu);
-    }
-
-    backdrop.addEventListener("click", fecharMenu);
-
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        fecharMenu();
-      }
-    });
-
-    window.addEventListener("resize", function () {
-      if (window.innerWidth >= 992) {
-        fecharMenu();
-      }
-    });
-  }
 
   async function verificarSessao() {
-    try {
-      const resposta = await fetch("/sessao", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          Accept: "application/json"
-        }
-      });
-
-      if (!resposta.ok) {
-        window.location.replace("index.html");
-        throw new Error("Sessão não encontrada");
-      }
-
-      const dados = await lerJsonSeguro(resposta);
-
-      if (!dados.usuario) {
-        window.location.replace("index.html");
-        throw new Error("Usuário não encontrado na sessão");
-      }
-
-      const statusGrupo = String(dados.usuario.statusGrupo || "").toLowerCase();
-      if (statusGrupo && statusGrupo !== "aceito") {
-        window.location.replace("aguardando.html");
-        throw new Error("Usuário ainda não foi aceito no grupo");
-      }
-    } catch (error) {
-      if (!String(error.message || "").includes("aceito no grupo")) {
-        window.location.replace("index.html");
-      }
-      throw error;
-    }
+    await ensureAcceptedSession();
   }
 
   async function carregarDados() {
     const [resGrupoItens, resItens, resCategorias] = await Promise.all([
-      fetch("/grupo-itens", { method: "GET", credentials: "include", headers: { Accept: "application/json" } }).catch(() => null),
-      fetch("/itens", { method: "GET", credentials: "include", headers: { Accept: "application/json" } }).catch(() => null),
-      fetch("/categorias", { method: "GET", credentials: "include", headers: { Accept: "application/json" } }).catch(() => null)
+      apiGet("/grupo-itens").catch(() => null),
+      apiGet("/itens").catch(() => null),
+      apiGet("/categorias").catch(() => null)
     ]);
 
-    itensEstoque = resGrupoItens && resGrupoItens.ok
-      ? normalizarGrupoItens(await lerJsonSeguro(resGrupoItens))
+    itensEstoque = resGrupoItens && resGrupoItens.response.ok
+      ? normalizarGrupoItens(resGrupoItens.data)
       : [];
 
-    itensGlobais = resItens && resItens.ok
-      ? garantirArray(await lerJsonSeguro(resItens))
+    itensGlobais = resItens && resItens.response.ok
+      ? ensureArray(resItens.data)
       : [];
 
-    categoriasGlobais = resCategorias && resCategorias.ok
-      ? garantirArray(await lerJsonSeguro(resCategorias))
+    categoriasGlobais = resCategorias && resCategorias.response.ok
+      ? ensureArray(resCategorias.data)
       : [];
   }
 
   function normalizarGrupoItens(lista) {
-    return garantirArray(lista).map(function (registro) {
+    return ensureArray(lista).map(function (registro) {
       return {
         id: Number(registro.id),
         grupoId: Number(registro.grupoId),
@@ -295,7 +217,7 @@ document.addEventListener("DOMContentLoaded", function () {
         nome: String(registro.item?.nome || "").trim(),
         unidade: String(registro.item?.unidadePadrao || "").trim(),
         quantidade: Number(registro.quantidade) || 0,
-        categoria: normalizarNomeCategoria(registro.item?.categoria?.nome || "")
+        categoria: normalizeCategoryName(registro.item?.categoria?.nome || "")
       };
     });
   }
@@ -304,7 +226,7 @@ document.addEventListener("DOMContentLoaded", function () {
     limparMensagem();
 
     const nome = String(campoNome.value || "").trim();
-    const quantidade = normalizarNumero(campoQuantidadeCadastro.value);
+    const quantidade = normalizeNumber(campoQuantidadeCadastro.value);
     const unidade = obterUnidadeFormulario();
     const categoria = obterCategoriaFormulario();
 
@@ -346,7 +268,7 @@ document.addEventListener("DOMContentLoaded", function () {
               return Number(item.itemId) === Number(itemGlobal.id);
             })
           : itensEstoque.some(function (item) {
-              return normalizarTexto(item.nome) === normalizarTexto(nome);
+              return normalizeText(item.nome) === normalizeText(nome);
             });
 
         if (itemJaExisteNoGrupo) {
@@ -471,7 +393,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function salvarQuantidadeDigitada(id, valorDigitado) {
-    const quantidade = normalizarNumero(valorDigitado);
+    const quantidade = normalizeNumber(valorDigitado);
 
     if (!Number.isFinite(quantidade) || quantidade < 0) {
       exibirMensagem("Quantidade inválida.", "warning");
@@ -569,10 +491,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     linha.classList.add("item-row");
-    linha.dataset.item = normalizarTexto(item.nome);
-    linha.dataset.categoria = normalizarTexto(item.categoria);
+    linha.dataset.item = normalizeText(item.nome);
+    linha.dataset.categoria = normalizeText(item.categoria);
     linha.dataset.quantidade = String(Number(item.quantidade) || 0);
-    linha.dataset.unidade = normalizarTexto(item.unidade);
+    linha.dataset.unidade = normalizeText(item.unidade);
 
     if (Number(item.quantidade) === 0) {
       linha.classList.add("is-zero", "status-danger");
@@ -613,7 +535,7 @@ document.addEventListener("DOMContentLoaded", function () {
       campoQuantidadeLinha.type = "text";
       campoQuantidadeLinha.inputMode = "decimal";
       campoQuantidadeLinha.className = "form-control form-control-sm campo-quantidade";
-      campoQuantidadeLinha.value = formatarValorCampo(item.quantidade);
+      campoQuantidadeLinha.value = formatFieldValue(item.quantidade);
       campoQuantidadeLinha.setAttribute("aria-label", `Quantidade do item ${item.nome}`);
 
       const botaoAumentar = document.createElement("button");
@@ -681,7 +603,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function preencherFormulario(item) {
     campoNome.value = item.nome;
-    campoQuantidadeCadastro.value = formatarValorCampo(item.quantidade);
+    campoQuantidadeCadastro.value = formatFieldValue(item.quantidade);
 
     preencherSelectOuOutro(
       campoUnidade,
@@ -701,7 +623,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function preencherCampoCategoria(categoria) {
-    const categoriaNormalizada = normalizarNomeCategoria(categoria);
+    const categoriaNormalizada = normalizeCategoryName(categoria);
 
     if (!categoriaNormalizada) {
       campoCategoria.value = "";
@@ -710,7 +632,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const existeNaLista = Array.from(campoCategoria.options).some(function (option) {
-      return normalizarTexto(option.value) === normalizarTexto(categoriaNormalizada);
+      return normalizeText(option.value) === normalizeText(categoriaNormalizada);
     });
 
     if (existeNaLista) {
@@ -778,11 +700,11 @@ document.addEventListener("DOMContentLoaded", function () {
     return lista.filter(function (item) {
       const correspondeItem =
         !filtrosAtivos.item ||
-        normalizarTexto(item.nome).includes(normalizarTexto(filtrosAtivos.item));
+        normalizeText(item.nome).includes(normalizeText(filtrosAtivos.item));
 
       const correspondeCategoria =
         !filtrosAtivos.categoria ||
-        normalizarTexto(item.categoria) === normalizarTexto(filtrosAtivos.categoria);
+        normalizeText(item.categoria) === normalizeText(filtrosAtivos.categoria);
 
       return correspondeItem && correspondeCategoria;
     });
@@ -795,15 +717,15 @@ document.addEventListener("DOMContentLoaded", function () {
       let comparacao = 0;
 
       if (estadoOrdenacao.campo === "item") {
-        comparacao = compararTexto(a.nome, b.nome);
+        comparacao = compareText(a.nome, b.nome);
       } else if (estadoOrdenacao.campo === "quantidade") {
-        comparacao = compararNumero(a.quantidade, b.quantidade);
+        comparacao = compareNumber(a.quantidade, b.quantidade);
       } else if (estadoOrdenacao.campo === "categoria") {
-        comparacao = compararTexto(a.categoria, b.categoria);
+        comparacao = compareText(a.categoria, b.categoria);
       }
 
       if (comparacao === 0) {
-        comparacao = compararTexto(a.nome, b.nome);
+        comparacao = compareText(a.nome, b.nome);
       }
 
       return estadoOrdenacao.direcao === "desc" ? comparacao * -1 : comparacao;
@@ -859,61 +781,34 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function atualizarResumoFiltros() {
-    if (!resumoFiltrosEstoque) {
-      return;
-    }
-
-    resumoFiltrosEstoque.textContent = "";
-
-    if (filtrosAtivos.item) {
-      resumoFiltrosEstoque.appendChild(
-        criarChipFiltro("Item: " + filtrosAtivos.item, function () {
+    renderFilterSummary(resumoFiltrosEstoque, [
+      {
+        label: "Item",
+        value: filtrosAtivos.item,
+        onRemove: function () {
           filtrosAtivos.item = "";
           if (filtroItemEstoque) {
             filtroItemEstoque.value = "";
           }
           renderizarTabela();
-        })
-      );
-    }
-
-    if (filtrosAtivos.categoria) {
-      resumoFiltrosEstoque.appendChild(
-        criarChipFiltro("Categoria: " + filtrosAtivos.categoria, function () {
+        }
+      },
+      {
+        label: "Categoria",
+        value: filtrosAtivos.categoria,
+        onRemove: function () {
           filtrosAtivos.categoria = "";
           if (filtroCategoriaEstoque) {
             filtroCategoriaEstoque.value = "";
           }
           renderizarTabela();
-        })
-      );
-    }
-  }
-
-  function criarChipFiltro(texto, aoRemover) {
-    const chip = document.createElement("span");
-    chip.className = "filter-chip";
-
-    const textoChip = document.createElement("span");
-    textoChip.textContent = texto;
-
-    const botao = document.createElement("button");
-    botao.type = "button";
-    botao.setAttribute("aria-label", "Remover filtro");
-    botao.textContent = "×";
-    botao.addEventListener("click", aoRemover);
-
-    chip.appendChild(textoChip);
-    chip.appendChild(botao);
-    return chip;
+        }
+      }
+    ]);
   }
 
   function atualizarContadorItens(quantidade) {
-    if (!contadorItensEstoque) {
-      return;
-    }
-
-    contadorItensEstoque.textContent = `${quantidade} item(ns) exibido(s)`;
+    updateCountLabel(contadorItensEstoque, quantidade, "item(ns) exibido(s)");
   }
 
   function configurarOrdenacaoPorCabecalho(elemento, campo) {
@@ -946,21 +841,21 @@ document.addEventListener("DOMContentLoaded", function () {
     const categoriasSet = new Set();
 
     categoriasGlobais.forEach(function (categoria) {
-      const nome = normalizarNomeCategoria(categoria.nome || categoria);
+      const nome = normalizeCategoryName(categoria.nome || categoria);
       if (nome) {
         categoriasSet.add(nome);
       }
     });
 
     itensGlobais.forEach(function (item) {
-      const nomeCategoria = normalizarNomeCategoria(item.categoria?.nome || item.categoria || "");
+      const nomeCategoria = normalizeCategoryName(item.categoria?.nome || item.categoria || "");
       if (nomeCategoria) {
         categoriasSet.add(nomeCategoria);
       }
     });
 
     itensEstoque.forEach(function (item) {
-      const nomeCategoria = normalizarNomeCategoria(item.categoria || "");
+      const nomeCategoria = normalizeCategoryName(item.categoria || "");
       if (nomeCategoria) {
         categoriasSet.add(nomeCategoria);
       }
@@ -1035,10 +930,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function obterCategoriaFormulario() {
     if (campoCategoria.value === "__nova__") {
-      return normalizarNomeCategoria(campoCategoriaOutra.value);
+      return normalizeCategoryName(campoCategoriaOutra.value);
     }
 
-    return normalizarNomeCategoria(campoCategoria.value);
+    return normalizeCategoryName(campoCategoria.value);
   }
 
   function obterUnidadeFormulario() {
@@ -1081,10 +976,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function buscarItemGlobalPorNome(nome) {
-    const nomeNormalizado = normalizarTexto(nome);
+    const nomeNormalizado = normalizeText(nome);
 
     return itensGlobais.find(function (item) {
-      return normalizarTexto(item.nome) === nomeNormalizado;
+      return normalizeText(item.nome) === nomeNormalizado;
     }) || null;
   }
 
@@ -1093,7 +988,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const termo = normalizarTexto(texto);
+    const termo = normalizeText(texto);
     sugestoesItemContainer.textContent = "";
 
     if (!termo) {
@@ -1102,7 +997,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const sugestoes = itensGlobais
       .filter(function (item) {
-        return normalizarTexto(item.nome).includes(termo);
+        return normalizeText(item.nome).includes(termo);
       })
       .slice(0, 8);
 
@@ -1129,17 +1024,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function compararTexto(a, b) {
+  function compareText(a, b) {
     return String(a || "").localeCompare(String(b || ""), "pt-BR", {
       sensitivity: "base"
     });
   }
 
-  function compararNumero(a, b) {
+  function compareNumber(a, b) {
     return (Number(a) || 0) - (Number(b) || 0);
   }
 
-  function normalizarNumero(valor) {
+  function normalizeNumber(valor) {
     const texto = String(valor || "")
       .trim()
       .replace(/\s+/g, "")
@@ -1149,7 +1044,7 @@ document.addEventListener("DOMContentLoaded", function () {
     return parseFloat(texto);
   }
 
-  function normalizarTexto(valor) {
+  function normalizeText(valor) {
     return String(valor || "")
       .trim()
       .toLowerCase()
@@ -1157,11 +1052,11 @@ document.addEventListener("DOMContentLoaded", function () {
       .replace(/[\u0300-\u036f]/g, "");
   }
 
-  function normalizarNomeCategoria(valor) {
+  function normalizeCategoryName(valor) {
     return String(valor || "").trim().replace(/\s+/g, " ");
   }
 
-  function formatarValorCampo(valor) {
+  function formatFieldValue(valor) {
     const numero = Number(valor);
 
     if (!Number.isFinite(numero)) {
@@ -1175,15 +1070,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function exibirMensagem(mensagem, tipo) {
-    campoMensagem.textContent = mensagem;
-    campoMensagem.className = `small text-${tipo}`;
-    campoMensagem.setAttribute("role", tipo === "danger" || tipo === "warning" ? "alert" : "status");
+    setFeedbackMessage(campoMensagem, mensagem, tipo);
   }
 
   function limparMensagem() {
-    campoMensagem.textContent = "";
-    campoMensagem.className = "small";
-    campoMensagem.setAttribute("role", "status");
+    clearFeedbackMessage(campoMensagem);
   }
 
   function definirEstadoSalvamento(salvando) {
@@ -1215,15 +1106,8 @@ document.addEventListener("DOMContentLoaded", function () {
     campoCategoriaOutra.disabled = Boolean(idEdicao);
   }
 
-  async function lerJsonSeguro(resposta) {
-    try {
-      return await resposta.json();
-    } catch {
-      return {};
-    }
-  }
 
-  function garantirArray(valor) {
+  function ensureArray(valor) {
     return Array.isArray(valor) ? valor : [];
   }
 });
