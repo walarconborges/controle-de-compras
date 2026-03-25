@@ -138,6 +138,38 @@ function normalizarTextoSimples(valor) {
   return String(valor || "").trim();
 }
 
+function normalizarUnidade(valor) {
+  const unidade = normalizarTextoSimples(valor).toLowerCase();
+
+  const mapa = {
+    'kg': 'quilograma(s)',
+    'quilo': 'quilograma(s)',
+    'quilos': 'quilograma(s)',
+    'quilograma': 'quilograma(s)',
+    'quilogramas': 'quilograma(s)',
+    'g': 'grama(s)',
+    'grama': 'grama(s)',
+    'gramas': 'grama(s)',
+    'l': 'litro(s)',
+    'litro': 'litro(s)',
+    'litros': 'litro(s)',
+    'ml': 'mililitro(s)',
+    'mililitro': 'mililitro(s)',
+    'mililitros': 'mililitro(s)',
+    'unidade': 'unidade(s)',
+    'unidades': 'unidade(s)',
+    'unidade(s)': 'unidade(s)',
+    'caixa': 'caixa(s)',
+    'caixas': 'caixa(s)',
+    'caixa(s)': 'caixa(s)',
+    'pacote': 'pacote(s)',
+    'pacotes': 'pacote(s)',
+    'pacote(s)': 'pacote(s)',
+  };
+
+  return mapa[unidade] || normalizarTextoSimples(valor);
+}
+
 function normalizarEmail(valor) {
   return String(valor || "").trim().toLowerCase();
 }
@@ -472,7 +504,7 @@ app.post("/itens", exigirAutenticacao, exigirPapel("admin"), async (req, res) =>
       data: {
         nome: nome.trim(),
         categoriaId: categoriaIdNumero,
-        unidadePadrao: unidadePadrao.trim(),
+        unidadePadrao: normalizarUnidade(unidadePadrao),
       },
     });
 
@@ -515,7 +547,7 @@ app.put("/itens/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res)
       data: {
         nome: nome.trim(),
         categoriaId: categoriaIdNumero,
-        unidadePadrao: unidadePadrao.trim(),
+        unidadePadrao: normalizarUnidade(unidadePadrao),
       },
     });
 
@@ -1748,7 +1780,7 @@ app.post("/grupo-itens", exigirAutenticacao, async (req, res) => {
       ? Number(req.body.itemId)
       : null;
     const nome = normalizarTextoSimples(req.body?.nome);
-    const unidade = normalizarTextoSimples(req.body?.unidade);
+    const unidade = normalizarUnidade(req.body?.unidade);
     const categoria = normalizarTextoSimples(req.body?.categoria);
     const quantidadeNumero = normalizarDecimal(req.body?.quantidade);
     const comprarBooleano = converterBoolean(req.body?.comprar);
@@ -2072,7 +2104,7 @@ async function encontrarOuCriarCategoriaTx(tx, nomeCategoria) {
 
 async function encontrarOuCriarItemTx(tx, { itemId, nome, unidade, categoriaNome }) {
   const nomeNormalizado = normalizarTextoSimples(nome);
-  const unidadeNormalizada = normalizarTextoSimples(unidade);
+  const unidadeNormalizada = normalizarUnidade(unidade);
   const categoriaNormalizada = normalizarTextoSimples(categoriaNome);
 
   if (itemId) {
@@ -2205,7 +2237,7 @@ app.post("/compras", exigirAutenticacao, async (req, res) => {
           ? Number(item.itemId)
           : null,
       nome: normalizarTextoSimples(item?.nome),
-      unidade: normalizarTextoSimples(item?.unidade),
+      unidade: normalizarUnidade(item?.unidade),
       categoria: normalizarTextoSimples(item?.categoria),
       quantidade: normalizarDecimal(item?.quantidade),
       valorUnitario: normalizarDecimal(item?.valorUnitario),
