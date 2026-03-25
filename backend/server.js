@@ -1946,9 +1946,6 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(PUBLIC_PATH, "index.html"));
 });
 
-const PORTA = Number(process.env.PORT) || 3001;
-const HOST = "0.0.0.0";
-
 app.get("/health", (req, res) => {
   res.status(200).send("ok");
 });
