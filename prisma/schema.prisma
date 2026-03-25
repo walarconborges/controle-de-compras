@@ -8,7 +8,7 @@ datasource db {
 
 model Usuario {
   id             Int                   @id @default(autoincrement())
-  nome           String
+  nome           String                @unique
   sobrenome      String                @default("")
   email          String                @unique
   senhaHash      String                @map("senha_hash")
@@ -19,7 +19,6 @@ model Usuario {
   compras        Compra[]
   movimentacoes  MovimentacaoEstoque[]
 
-  @@unique([nome, sobrenome])
   @@map("usuarios")
 }
 

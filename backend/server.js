@@ -156,28 +156,14 @@ function gerarCodigoGrupo(nomeGrupo, grupoId) {
   return `${String(nomeGrupo || "").trim()}-${grupoId}`.toUpperCase();
 }
 
-const SELECT_USUARIO_PADRAO = {
-  id: true,
-  nome: true,
-  sobrenome: true,
-  email: true,
-  ativo: true,
-  criadoEm: true,
-  atualizadoEm: true,
-};
-
 function montarNomeCompleto(nome, sobrenome) {
   return [String(nome || "").trim(), String(sobrenome || "").trim()]
     .filter(Boolean)
-    .join(" ")
-    .trim();
+    .join(" " );
 }
 
 function normalizarUsuarioResposta(usuario) {
-  if (!usuario) {
-    return null;
-  }
-
+  if (!usuario) return usuario;
   return {
     ...usuario,
     sobrenome: usuario.sobrenome || "",
@@ -739,12 +725,20 @@ app.get("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res) 
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+            criadoEm: true,
+            atualizadoEm: true,
+          },
         },
       },
     });
 
-    const usuarios = vinculos.map((vinculo) => normalizarUsuarioResposta(vinculo.usuario));
+    const usuarios = vinculos.map((vinculo) => vinculo.usuario);
 
     res.json(usuarios);
   } catch (error) {
@@ -769,7 +763,15 @@ app.get("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, r
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+            criadoEm: true,
+            atualizadoEm: true,
+          },
         },
       },
     });
@@ -793,7 +795,7 @@ app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res)
     const senha = normalizarTextoSimples(req.body?.senha);
     const ativo = req.body?.ativo;
 
-    if (!nome || !nome.trim()) {
+    if (!nome) {
       return res.status(400).json({ erro: "O nome é obrigatório" });
     }
 
@@ -819,7 +821,15 @@ app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res)
         senhaHash,
         ativo: typeof ativo === "boolean" ? ativo : true,
       },
-      select: SELECT_USUARIO_PADRAO,
+      select: {
+        id: true,
+        nome: true,
+        sobrenome: true,
+        email: true,
+        ativo: true,
+        criadoEm: true,
+        atualizadoEm: true,
+      },
     });
 
     res.status(201).json(normalizarUsuarioResposta(usuario));
@@ -827,7 +837,7 @@ app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res)
     console.error("Erro ao criar usuário:", error);
 
     if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Nome, sobrenome ou email já cadastrado" });
+      return res.status(409).json({ erro: "Nome ou email já cadastrado" });
     }
 
     res.status(500).json({ erro: "Erro ao criar usuário" });
@@ -848,7 +858,7 @@ app.put("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, r
       return res.status(400).json({ erro: "ID inválido" });
     }
 
-    if (!nome || !nome.trim()) {
+    if (!nome) {
       return res.status(400).json({ erro: "O nome é obrigatório" });
     }
 
@@ -885,7 +895,15 @@ app.put("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, r
     const usuario = await prisma.usuario.update({
       where: { id },
       data: dadosAtualizacao,
-      select: SELECT_USUARIO_PADRAO,
+      select: {
+        id: true,
+        nome: true,
+        sobrenome: true,
+        email: true,
+        ativo: true,
+        criadoEm: true,
+        atualizadoEm: true,
+      },
     });
 
     res.json(normalizarUsuarioResposta(usuario));
@@ -897,7 +915,7 @@ app.put("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, r
     }
 
     if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Nome, sobrenome ou email já cadastrado" });
+      return res.status(409).json({ erro: "Nome ou email já cadastrado" });
     }
 
     res.status(500).json({ erro: "Erro ao atualizar usuário" });
@@ -1006,6 +1024,7 @@ app.post("/cadastro", async (req, res) => {
     }
 
     const senhaHash = await bcrypt.hash(senha, 10);
+
     const resultado = await prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
         data: {
@@ -1013,6 +1032,13 @@ app.post("/cadastro", async (req, res) => {
           sobrenome,
           email,
           senhaHash,
+          ativo: true,
+        },
+        select: {
+          id: true,
+          nome: true,
+          sobrenome: true,
+          email: true,
           ativo: true,
         },
       });
@@ -1081,7 +1107,7 @@ app.post("/cadastro", async (req, res) => {
     console.error("Erro ao realizar cadastro:", error);
 
     if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Já existe um usuário com esse nome, sobrenome ou email" });
+      return res.status(409).json({ erro: "Já existe um usuário com esse nome ou email" });
     }
 
     res.status(500).json({ erro: "Erro ao realizar cadastro" });
@@ -1215,7 +1241,13 @@ app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res) => {
       orderBy: [{ status: "asc" }, { papel: "asc" }, { id: "asc" }],
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+          },
         },
       },
     });
@@ -1239,12 +1271,18 @@ app.get("/meu-grupo/solicitacoes", exigirAutenticacao, exigirPapel("admin"), asy
       orderBy: { id: "asc" },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+          },
         },
       },
     });
 
-    res.json(solicitacoes.map((vinculo) => ({ ...vinculo, usuario: normalizarUsuarioResposta(vinculo.usuario) })));
+    res.json(solicitacoes.map((solicitacao) => ({ ...solicitacao, usuario: normalizarUsuarioResposta(solicitacao.usuario) })));
   } catch (error) {
     console.error("Erro ao carregar solicitações do grupo:", error);
     res.status(500).json({ erro: "Erro ao carregar solicitações do grupo" });
@@ -1279,7 +1317,7 @@ app.patch("/meu-grupo/solicitacoes/:id/aceitar", exigirAutenticacao, exigirPapel
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: { id: true, nome: true, email: true, ativo: true },
         },
       },
     });
@@ -1318,7 +1356,7 @@ app.patch("/meu-grupo/solicitacoes/:id/recusar", exigirAutenticacao, exigirPapel
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: { id: true, nome: true, email: true, ativo: true },
         },
       },
     });
@@ -1357,13 +1395,19 @@ app.get("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (req
       orderBy: { id: "asc" },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+          },
         },
         grupo: true,
       },
     });
 
-    res.json(vinculos.map((vinculo) => ({ ...vinculo, usuario: normalizarUsuarioResposta(vinculo.usuario) })));
+    res.json(vinculos);
   } catch (error) {
     console.error("Erro ao buscar vínculos:", error);
     res.status(500).json({ erro: "Erro ao buscar vínculos" });
@@ -1386,7 +1430,13 @@ app.get("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("admin"), async 
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+          },
         },
         grupo: true,
       },
@@ -1436,7 +1486,13 @@ app.post("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (re
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+          },
         },
         grupo: true,
       },
@@ -1502,7 +1558,13 @@ app.put("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("admin"), async 
       },
       include: {
         usuario: {
-          select: SELECT_USUARIO_PADRAO,
+          select: {
+            id: true,
+            nome: true,
+            sobrenome: true,
+            email: true,
+            ativo: true,
+          },
         },
         grupo: true,
       },
@@ -2049,6 +2111,7 @@ app.get("/compras", exigirAutenticacao, async (req, res) => {
           select: {
             id: true,
             nome: true,
+            sobrenome: true,
             email: true,
           },
         },
@@ -2252,6 +2315,7 @@ app.get("/movimentacoes-estoque", exigirAutenticacao, async (req, res) => {
           select: {
             id: true,
             nome: true,
+            sobrenome: true,
             email: true,
           },
         },
