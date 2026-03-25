@@ -59,7 +59,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: 1000 * 60 * 60 * 24,
     },
@@ -132,6 +132,10 @@ function normalizarDecimal(valor) {
 
 function normalizarTextoSimples(valor) {
   return String(valor || "").trim();
+}
+
+function normalizarEmail(valor) {
+  return String(valor || "").trim().toLowerCase();
 }
 
 function decimalParaNumero(valor) {
@@ -688,7 +692,7 @@ app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res)
       return res.status(400).json({ erro: "O email é obrigatório" });
     }
 
-    if (!senha || !senha.trim()) {
+    if (!senha) {
       return res.status(400).json({ erro: "A senha é obrigatória" });
     }
 
@@ -827,24 +831,105 @@ app.delete("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req
   }
 });
 
+app.post("/cadastro", async (req, res) => {
+  try {
+    const nome = normalizarTextoSimples(req.body?.nome);
+    const sobrenome = normalizarTextoSimples(req.body?.sobrenome);
+    const email = normalizarEmail(req.body?.email);
+    const senha = normalizarTextoSimples(req.body?.senha);
+
+    if (!nome) {
+      return res.status(400).json({ erro: "O nome é obrigatório" });
+    }
+
+    if (!sobrenome) {
+      return res.status(400).json({ erro: "O sobrenome é obrigatório" });
+    }
+
+    if (!email) {
+      return res.status(400).json({ erro: "O email é obrigatório" });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ erro: "O email informado é inválido" });
+    }
+
+    if (!senha || senha.length < 6) {
+      return res.status(400).json({ erro: "A senha deve ter pelo menos 6 caracteres" });
+    }
+
+    const senhaHash = await bcrypt.hash(senha, 10);
+    const nomeCompleto = `${nome} ${sobrenome}`.trim();
+
+    const resultado = await prisma.$transaction(async (tx) => {
+      const usuario = await tx.usuario.create({
+        data: {
+          nome: nomeCompleto,
+          email,
+          senhaHash,
+          ativo: true,
+        },
+      });
+
+      const grupo = await tx.grupo.create({
+        data: {
+          nome: `Grupo de ${nomeCompleto}`,
+        },
+      });
+
+      const vinculo = await tx.usuarioGrupo.create({
+        data: {
+          usuarioId: usuario.id,
+          grupoId: grupo.id,
+          papel: "admin",
+        },
+      });
+
+      return { usuario, grupo, vinculo };
+    });
+
+    req.session.usuario = {
+      id: resultado.usuario.id,
+      nome: resultado.usuario.nome,
+      email: resultado.usuario.email,
+      grupoId: resultado.grupo.id,
+      papel: resultado.vinculo.papel,
+    };
+
+    res.status(201).json({
+      mensagem: "Cadastro realizado com sucesso",
+      usuario: req.session.usuario,
+    });
+  } catch (error) {
+    console.error("Erro ao realizar cadastro:", error);
+
+    if (error.code === "P2002") {
+      return res.status(409).json({ erro: "Já existe um usuário com esse email" });
+    }
+
+    res.status(500).json({ erro: "Erro ao realizar cadastro" });
+  }
+});
+
 /*
   LOGIN E SESSÃO
 */
 
 app.post("/login", async (req, res) => {
   try {
-    const { email, senha } = req.body;
+    const email = normalizarEmail(req.body?.email);
+    const senha = normalizarTextoSimples(req.body?.senha);
 
-    if (!email || !email.trim()) {
+    if (!email) {
       return res.status(400).json({ erro: "O email é obrigatório" });
     }
 
-    if (!senha || !senha.trim()) {
+    if (!senha) {
       return res.status(400).json({ erro: "A senha é obrigatória" });
     }
 
     const usuario = await prisma.usuario.findUnique({
-      where: { email: email.trim() },
+      where: { email },
     });
 
     if (!usuario) {
@@ -855,7 +940,7 @@ app.post("/login", async (req, res) => {
       return res.status(403).json({ erro: "Usuário inativo" });
     }
 
-    const senhaCorreta = await bcrypt.compare(senha.trim(), usuario.senhaHash);
+    const senhaCorreta = await bcrypt.compare(senha, usuario.senhaHash);
 
     if (!senhaCorreta) {
       return res.status(401).json({ erro: "Credenciais inválidas" });
@@ -1861,6 +1946,9 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(PUBLIC_PATH, "index.html"));
 });
 
-app.listen(3001, () => {
-  console.log("Servidor rodando na porta 3001");
+const PORTA = Number(process.env.PORT) || 3001;
+const HOST = "0.0.0.0";
+
+app.listen(PORTA, HOST, () => {
+  console.log(`Servidor rodando em ${HOST}:${PORTA}`);
 });

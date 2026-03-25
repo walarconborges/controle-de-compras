@@ -27,3 +27,17 @@ body {
     border-radius: 10px;
   }
 }
+
+#cadastro-message:empty {
+  display: none;
+}
+
+.modal-content {
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+}
+
+.modal-header,
+.modal-footer {
+  border-color: #dee2e6;
+}
