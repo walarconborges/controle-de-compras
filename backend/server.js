@@ -10,6 +10,8 @@ const session = require("express-session");
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
 });
@@ -58,6 +60,7 @@ app.use(
     secret: process.env.SESSION_SECRET || "troque-essa-chave-depois",
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
