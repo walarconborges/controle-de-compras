@@ -1,1795 +1,390 @@
-require("dotenv").config({ path: "../.env" });
-
-const path = require("path");
-const express = require("express");
-const cors = require("cors");
-const { PrismaClient } = require("@prisma/client");
-const { PrismaPg } = require("@prisma/adapter-pg");
-const bcrypt = require("bcrypt");
-const session = require("express-session");
-
-const app = express();
-
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const prisma = new PrismaClient({ adapter });
-
-const PUBLIC_PATH = path.resolve(__dirname, "../public");
-
-const ORIGENS_PERMITIDAS = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:3001",
-  "http://127.0.0.1:3001",
-  "http://localhost:5500",
-  "http://127.0.0.1:5500",
-  "http://localhost:5501",
-  "http://127.0.0.1:5501",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (ORIGENS_PERMITIDAS.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Origem não permitida pelo CORS"));
-    },
-    credentials: true,
-  })
-);
-
-app.use(express.json());
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "troque-essa-chave-depois",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      maxAge: 1000 * 60 * 60 * 24,
-    },
-  })
-);
-
-function exigirAutenticacao(req, res, next) {
-  if (!req.session.usuario) {
-    return res.status(401).json({ erro: "Usuário não autenticado" });
-  }
-
-  next();
-}
-
-function exigirPapel(...papeisPermitidos) {
-  return (req, res, next) => {
-    if (!req.session.usuario) {
-      return res.status(401).json({ erro: "Usuário não autenticado" });
-    }
-
-    if (!papeisPermitidos.includes(req.session.usuario.papel)) {
-      return res.status(403).json({ erro: "Acesso negado" });
-    }
-
-    next();
-  };
-}
-
-function obterGrupoIdSessao(req) {
-  return req.session.usuario?.grupoId;
-}
-
-function idsSaoIguais(a, b) {
-  return Number(a) === Number(b);
-}
-
-function converterBoolean(valor) {
-  if (typeof valor === "boolean") {
-    return valor;
-  }
-
-  if (typeof valor === "string") {
-    const valorNormalizado = valor.trim().toLowerCase();
-
-    if (valorNormalizado === "true") {
-      return true;
-    }
-
-    if (valorNormalizado === "false") {
-      return false;
-    }
-  }
-
-  return null;
-}
-
-function normalizarDecimal(valor) {
-  if (valor === null || valor === undefined || valor === "") {
-    return null;
-  }
-
-  const numero = Number(valor);
-
-  if (!Number.isFinite(numero)) {
-    return null;
-  }
-
-  return numero;
-}
-
-function normalizarTextoSimples(valor) {
-  return String(valor || "").trim();
-}
-
-function decimalParaNumero(valor) {
-  if (valor === null || valor === undefined) {
-    return null;
-  }
-
-  const numero = Number(valor);
-
-  if (!Number.isFinite(numero)) {
-    return null;
-  }
-
-  return numero;
-}
-
-
-function normalizarCompraItemResposta(compraItem) {
-  return {
-    ...compraItem,
-    quantidade: decimalParaNumero(compraItem.quantidade),
-    valorUnitario: decimalParaNumero(compraItem.valorUnitario),
-  };
-}
-
-function normalizarCompraResposta(compra) {
-  return {
-    ...compra,
-    compraItens: Array.isArray(compra.compraItens)
-      ? compra.compraItens.map(normalizarCompraItemResposta)
-      : [],
-  };
-}
-
-app.get("/api", async (req, res) => {
-  try {
-    await prisma.$connect();
-    res.send("API rodando");
-  } catch (error) {
-    console.error("Erro ao conectar com o banco:", error);
-    res.status(500).send("Erro ao conectar com o banco");
-  }
-});
-
-app.get("/teste-banco", async (req, res) => {
-  try {
-    await prisma.$connect();
-    res.send("Conexão com o banco funcionando");
-  } catch (error) {
-    console.error("Erro no teste com o banco:", error);
-    res.status(500).send("Erro ao conectar com o banco");
-  }
-});
-
-/*
-  CATEGORIAS E ITENS
-  Globais do sistema.
-*/
-
-app.get("/categorias", async (req, res) => {
-  try {
-    const categorias = await prisma.categoria.findMany({
-      orderBy: { id: "asc" },
-    });
-
-    res.json(categorias);
-  } catch (error) {
-    console.error("Erro ao buscar categorias:", error);
-    res.status(500).json({ erro: "Erro ao buscar categorias" });
-  }
-});
-
-app.get("/categorias/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const categoria = await prisma.categoria.findUnique({
-      where: { id },
-    });
-
-    if (!categoria) {
-      return res.status(404).json({ erro: "Categoria não encontrada" });
-    }
-
-    res.json(categoria);
-  } catch (error) {
-    console.error("Erro ao buscar categoria:", error);
-    res.status(500).json({ erro: "Erro ao buscar categoria" });
-  }
-});
-
-app.post("/categorias", async (req, res) => {
-  try {
-    const { nome } = req.body;
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome da categoria é obrigatório" });
-    }
-
-    const categoria = await prisma.categoria.create({
-      data: { nome: nome.trim() },
-    });
-
-    res.status(201).json(categoria);
-  } catch (error) {
-    console.error("Erro ao criar categoria:", error);
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Essa categoria já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao criar categoria" });
-  }
-});
-
-app.put("/categorias/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { nome } = req.body;
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome da categoria é obrigatório" });
-    }
-
-    const categoria = await prisma.categoria.update({
-      where: { id },
-      data: { nome: nome.trim() },
-    });
-
-    res.json(categoria);
-  } catch (error) {
-    console.error("Erro ao atualizar categoria:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Categoria não encontrada" });
-    }
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Essa categoria já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao atualizar categoria" });
-  }
-});
-
-app.delete("/categorias/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    await prisma.categoria.delete({
-      where: { id },
-    });
-
-    res.json({ mensagem: "Categoria excluída com sucesso" });
-  } catch (error) {
-    console.error("Erro ao excluir categoria:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Categoria não encontrada" });
-    }
-
-    res.status(500).json({ erro: "Erro ao excluir categoria" });
-  }
-});
-
-app.get("/itens", async (req, res) => {
-  try {
-    const itens = await prisma.item.findMany({
-      orderBy: { id: "asc" },
-      include: {
-        categoria: true,
-      },
-    });
-
-    res.json(itens);
-  } catch (error) {
-    console.error("Erro ao buscar itens:", error);
-    res.status(500).json({ erro: "Erro ao buscar itens" });
-  }
-});
-
-app.get("/itens/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const item = await prisma.item.findUnique({
-      where: { id },
-      include: {
-        categoria: true,
-      },
-    });
-
-    if (!item) {
-      return res.status(404).json({ erro: "Item não encontrado" });
-    }
-
-    res.json(item);
-  } catch (error) {
-    console.error("Erro ao buscar item:", error);
-    res.status(500).json({ erro: "Erro ao buscar item" });
-  }
-});
-
-app.post("/itens", async (req, res) => {
-  try {
-    const { nome, categoriaId, unidadePadrao } = req.body;
-    const categoriaIdNumero = Number(categoriaId);
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome do item é obrigatório" });
-    }
-
-    if (!Number.isInteger(categoriaIdNumero) || categoriaIdNumero <= 0) {
-      return res.status(400).json({ erro: "categoriaId inválido" });
-    }
-
-    if (!unidadePadrao || !unidadePadrao.trim()) {
-      return res.status(400).json({ erro: "A unidade padrão é obrigatória" });
-    }
-
-    const item = await prisma.item.create({
-      data: {
-        nome: nome.trim(),
-        categoriaId: categoriaIdNumero,
-        unidadePadrao: unidadePadrao.trim(),
-      },
-    });
-
-    res.status(201).json(item);
-  } catch (error) {
-    console.error("Erro ao criar item:", error);
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse item já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao criar item" });
-  }
-});
-
-app.put("/itens/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { nome, categoriaId, unidadePadrao } = req.body;
-    const categoriaIdNumero = Number(categoriaId);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome do item é obrigatório" });
-    }
-
-    if (!Number.isInteger(categoriaIdNumero) || categoriaIdNumero <= 0) {
-      return res.status(400).json({ erro: "categoriaId inválido" });
-    }
-
-    if (!unidadePadrao || !unidadePadrao.trim()) {
-      return res.status(400).json({ erro: "A unidade padrão é obrigatória" });
-    }
-
-    const item = await prisma.item.update({
-      where: { id },
-      data: {
-        nome: nome.trim(),
-        categoriaId: categoriaIdNumero,
-        unidadePadrao: unidadePadrao.trim(),
-      },
-    });
-
-    res.json(item);
-  } catch (error) {
-    console.error("Erro ao atualizar item:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Item não encontrado" });
-    }
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse item já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao atualizar item" });
-  }
-});
-
-app.delete("/itens/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    await prisma.item.delete({
-      where: { id },
-    });
-
-    res.json({ mensagem: "Item excluído com sucesso" });
-  } catch (error) {
-    console.error("Erro ao excluir item:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Item não encontrado" });
-    }
-
-    res.status(500).json({ erro: "Erro ao excluir item" });
-  }
-});
-
-/*
-  GRUPOS
-*/
-
-app.get("/grupos", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const grupos = await prisma.grupo.findMany({
-      where: { id: grupoId },
-      orderBy: { id: "asc" },
-    });
-
-    res.json(grupos);
-  } catch (error) {
-    console.error("Erro ao buscar grupos:", error);
-    res.status(500).json({ erro: "Erro ao buscar grupos" });
-  }
-});
-
-app.get("/grupos/:id", exigirAutenticacao, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoIdSessao = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!idsSaoIguais(id, grupoIdSessao)) {
-      return res.status(403).json({ erro: "Acesso negado a outro grupo" });
-    }
-
-    const grupo = await prisma.grupo.findUnique({
-      where: { id },
-    });
-
-    if (!grupo) {
-      return res.status(404).json({ erro: "Grupo não encontrado" });
-    }
-
-    res.json(grupo);
-  } catch (error) {
-    console.error("Erro ao buscar grupo:", error);
-    res.status(500).json({ erro: "Erro ao buscar grupo" });
-  }
-});
-
-app.post("/grupos", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const { nome } = req.body;
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome do grupo é obrigatório" });
-    }
-
-    const grupo = await prisma.grupo.create({
-      data: { nome: nome.trim() },
-    });
-
-    res.status(201).json(grupo);
-  } catch (error) {
-    console.error("Erro ao criar grupo:", error);
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse grupo já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao criar grupo" });
-  }
-});
-
-app.put("/grupos/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoIdSessao = obterGrupoIdSessao(req);
-    const { nome } = req.body;
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!idsSaoIguais(id, grupoIdSessao)) {
-      return res.status(403).json({ erro: "Acesso negado a outro grupo" });
-    }
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome do grupo é obrigatório" });
-    }
-
-    const grupo = await prisma.grupo.update({
-      where: { id },
-      data: { nome: nome.trim() },
-    });
-
-    res.json(grupo);
-  } catch (error) {
-    console.error("Erro ao atualizar grupo:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Grupo não encontrado" });
-    }
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse grupo já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao atualizar grupo" });
-  }
-});
-
-app.delete("/grupos/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoIdSessao = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!idsSaoIguais(id, grupoIdSessao)) {
-      return res.status(403).json({ erro: "Acesso negado a outro grupo" });
-    }
-
-    await prisma.grupo.delete({
-      where: { id },
-    });
-
-    res.json({ mensagem: "Grupo excluído com sucesso" });
-  } catch (error) {
-    console.error("Erro ao excluir grupo:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Grupo não encontrado" });
-    }
-
-    res.status(500).json({ erro: "Erro ao excluir grupo" });
-  }
-});
-
-/*
-  USUÁRIOS
-*/
-
-app.get("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const vinculos = await prisma.usuarioGrupo.findMany({
-      where: {
-        grupoId,
-      },
-      orderBy: {
-        id: "asc",
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            ativo: true,
-            criadoEm: true,
-            atualizadoEm: true,
-          },
-        },
-      },
-    });
-
-    const usuarios = vinculos.map((vinculo) => vinculo.usuario);
-
-    res.json(usuarios);
-  } catch (error) {
-    console.error("Erro ao buscar usuários:", error);
-    res.status(500).json({ erro: "Erro ao buscar usuários" });
-  }
-});
-
-app.get("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        grupoId,
-        usuarioId: id,
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            ativo: true,
-            criadoEm: true,
-            atualizadoEm: true,
-          },
-        },
-      },
-    });
-
-    if (!vinculo || !vinculo.usuario) {
-      return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
-    }
-
-    res.json(vinculo.usuario);
-  } catch (error) {
-    console.error("Erro ao buscar usuário:", error);
-    res.status(500).json({ erro: "Erro ao buscar usuário" });
-  }
-});
-
-app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const { nome, email, senha, ativo } = req.body;
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome é obrigatório" });
-    }
-
-    if (!email || !email.trim()) {
-      return res.status(400).json({ erro: "O email é obrigatório" });
-    }
-
-    if (!senha || !senha.trim()) {
-      return res.status(400).json({ erro: "A senha é obrigatória" });
-    }
-
-    const senhaHash = await bcrypt.hash(senha.trim(), 10);
-
-    const usuario = await prisma.usuario.create({
-      data: {
-        nome: nome.trim(),
-        email: email.trim(),
-        senhaHash,
-        ativo: typeof ativo === "boolean" ? ativo : true,
-      },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        ativo: true,
-        criadoEm: true,
-        atualizadoEm: true,
-      },
-    });
-
-    res.status(201).json(usuario);
-  } catch (error) {
-    console.error("Erro ao criar usuário:", error);
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Nome ou email já cadastrado" });
-    }
-
-    res.status(500).json({ erro: "Erro ao criar usuário" });
-  }
-});
-
-app.put("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-    const { nome, email, senha, ativo } = req.body;
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!nome || !nome.trim()) {
-      return res.status(400).json({ erro: "O nome é obrigatório" });
-    }
-
-    if (!email || !email.trim()) {
-      return res.status(400).json({ erro: "O email é obrigatório" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        grupoId,
-        usuarioId: id,
-      },
-    });
-
-    if (!vinculo) {
-      return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
-    }
-
-    const dadosAtualizacao = {
-      nome: nome.trim(),
-      email: email.trim(),
-      ativo: typeof ativo === "boolean" ? ativo : true,
-    };
-
-    if (senha && senha.trim()) {
-      dadosAtualizacao.senhaHash = await bcrypt.hash(senha.trim(), 10);
-    }
-
-    const usuario = await prisma.usuario.update({
-      where: { id },
-      data: dadosAtualizacao,
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        ativo: true,
-        criadoEm: true,
-        atualizadoEm: true,
-      },
-    });
-
-    res.json(usuario);
-  } catch (error) {
-    console.error("Erro ao atualizar usuário:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Usuário não encontrado" });
-    }
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Nome ou email já cadastrado" });
-    }
-
-    res.status(500).json({ erro: "Erro ao atualizar usuário" });
-  }
-});
-
-app.delete("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        grupoId,
-        usuarioId: id,
-      },
-    });
-
-    if (!vinculo) {
-      return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
-    }
-
-    await prisma.usuario.delete({
-      where: { id },
-    });
-
-    res.json({ mensagem: "Usuário excluído com sucesso" });
-  } catch (error) {
-    console.error("Erro ao excluir usuário:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Usuário não encontrado" });
-    }
-
-    res.status(500).json({ erro: "Erro ao excluir usuário" });
-  }
-});
-
-/*
-  LOGIN E SESSÃO
-*/
-
-app.post("/login", async (req, res) => {
-  try {
-    const { email, senha } = req.body;
-
-    if (!email || !email.trim()) {
-      return res.status(400).json({ erro: "O email é obrigatório" });
-    }
-
-    if (!senha || !senha.trim()) {
-      return res.status(400).json({ erro: "A senha é obrigatória" });
-    }
-
-    const usuario = await prisma.usuario.findUnique({
-      where: { email: email.trim() },
-    });
-
-    if (!usuario) {
-      return res.status(401).json({ erro: "Credenciais inválidas" });
-    }
-
-    if (!usuario.ativo) {
-      return res.status(403).json({ erro: "Usuário inativo" });
-    }
-
-    const senhaCorreta = await bcrypt.compare(senha.trim(), usuario.senhaHash);
-
-    if (!senhaCorreta) {
-      return res.status(401).json({ erro: "Credenciais inválidas" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        usuarioId: usuario.id,
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
-
-    if (!vinculo) {
-      return res.status(403).json({ erro: "Usuário sem vínculo com grupo" });
-    }
-
-    req.session.usuario = {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      grupoId: vinculo.grupoId,
-      papel: vinculo.papel,
-    };
-
-    res.json({
-      mensagem: "Login realizado com sucesso",
-      usuario: req.session.usuario,
-    });
-  } catch (error) {
-    console.error("Erro ao fazer login:", error);
-    res.status(500).json({ erro: "Erro ao fazer login" });
-  }
-});
-
-app.get("/sessao", exigirAutenticacao, (req, res) => {
-  res.json({ usuario: req.session.usuario });
-});
-
-app.post("/logout", (req, res) => {
-  req.session.destroy((error) => {
-    if (error) {
-      console.error("Erro ao fazer logout:", error);
-      return res.status(500).json({ erro: "Erro ao fazer logout" });
-    }
-
-    res.clearCookie("connect.sid");
-    res.json({ mensagem: "Logout realizado com sucesso" });
-  });
-});
-
-/*
-  USUARIOS_GRUPOS
-*/
-
-app.get("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const vinculos = await prisma.usuarioGrupo.findMany({
-      where: {
-        grupoId,
-      },
-      orderBy: { id: "asc" },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            ativo: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(vinculos);
-  } catch (error) {
-    console.error("Erro ao buscar vínculos:", error);
-    res.status(500).json({ erro: "Erro ao buscar vínculos" });
-  }
-});
-
-app.get("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            ativo: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    if (!vinculo) {
-      return res.status(404).json({ erro: "Vínculo não encontrado no seu grupo" });
-    }
-
-    res.json(vinculo);
-  } catch (error) {
-    console.error("Erro ao buscar vínculo:", error);
-    res.status(500).json({ erro: "Erro ao buscar vínculo" });
-  }
-});
-
-app.post("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const { usuarioId, grupoId, papel } = req.body;
-    const grupoIdSessao = obterGrupoIdSessao(req);
-    const usuarioIdNumero = Number(usuarioId);
-    const grupoIdNumero = Number(grupoId);
-
-    if (!Number.isInteger(usuarioIdNumero) || usuarioIdNumero <= 0) {
-      return res.status(400).json({ erro: "usuarioId inválido" });
-    }
-
-    if (!Number.isInteger(grupoIdNumero) || grupoIdNumero <= 0) {
-      return res.status(400).json({ erro: "grupoId inválido" });
-    }
-
-    if (!idsSaoIguais(grupoIdNumero, grupoIdSessao)) {
-      return res.status(403).json({ erro: "Não é permitido criar vínculo em outro grupo" });
-    }
-
-    if (!papel || !papel.trim()) {
-      return res.status(400).json({ erro: "O papel é obrigatório" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.create({
-      data: {
-        usuarioId: usuarioIdNumero,
-        grupoId: grupoIdNumero,
-        papel: papel.trim(),
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            ativo: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.status(201).json(vinculo);
-  } catch (error) {
-    console.error("Erro ao criar vínculo:", error);
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse vínculo já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao criar vínculo" });
-  }
-});
-
-app.put("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { usuarioId, grupoId, papel } = req.body;
-    const grupoIdSessao = obterGrupoIdSessao(req);
-    const usuarioIdNumero = Number(usuarioId);
-    const grupoIdNumero = Number(grupoId);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (!Number.isInteger(usuarioIdNumero) || usuarioIdNumero <= 0) {
-      return res.status(400).json({ erro: "usuarioId inválido" });
-    }
-
-    if (!Number.isInteger(grupoIdNumero) || grupoIdNumero <= 0) {
-      return res.status(400).json({ erro: "grupoId inválido" });
-    }
-
-    if (!idsSaoIguais(grupoIdNumero, grupoIdSessao)) {
-      return res.status(403).json({ erro: "Não é permitido mover vínculo para outro grupo" });
-    }
-
-    if (!papel || !papel.trim()) {
-      return res.status(400).json({ erro: "O papel é obrigatório" });
-    }
-
-    const vinculoExistente = await prisma.usuarioGrupo.findFirst({
-      where: {
-        id,
-        grupoId: grupoIdSessao,
-      },
-    });
-
-    if (!vinculoExistente) {
-      return res.status(404).json({ erro: "Vínculo não encontrado no seu grupo" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.update({
-      where: { id },
-      data: {
-        usuarioId: usuarioIdNumero,
-        grupoId: grupoIdNumero,
-        papel: papel.trim(),
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            ativo: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(vinculo);
-  } catch (error) {
-    console.error("Erro ao atualizar vínculo:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Vínculo não encontrado" });
-    }
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse vínculo já existe" });
-    }
-
-    res.status(500).json({ erro: "Erro ao atualizar vínculo" });
-  }
-});
-
-app.delete("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-    });
-
-    if (!vinculo) {
-      return res.status(404).json({ erro: "Vínculo não encontrado no seu grupo" });
-    }
-
-    await prisma.usuarioGrupo.delete({
-      where: { id },
-    });
-
-    res.json({ mensagem: "Vínculo excluído com sucesso" });
-  } catch (error) {
-    console.error("Erro ao excluir vínculo:", error);
-
-    if (error.code === "P2025") {
-      return res.status(404).json({ erro: "Vínculo não encontrado" });
-    }
-
-    res.status(500).json({ erro: "Erro ao excluir vínculo" });
-  }
-});
-
-/*
-  GRUPO_ITENS
-  Base real de estoque e lista por grupo.
-*/
-
-app.get("/grupo-itens", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const grupoItens = await prisma.grupoItem.findMany({
-      where: {
-        grupoId,
-      },
-      orderBy: [
-        {
-          item: {
-            categoria: {
-              nome: "asc",
-            },
-          },
-        },
-        {
-          item: {
-            nome: "asc",
-          },
-        },
-      ],
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(grupoItens);
-  } catch (error) {
-    console.error("Erro ao buscar itens do grupo:", error);
-    res.status(500).json({ erro: "Erro ao buscar itens do grupo" });
-  }
-});
-
-app.get("/grupo-itens/comprar", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const grupoItens = await prisma.grupoItem.findMany({
-      where: {
-        grupoId,
-        comprar: true,
-      },
-      orderBy: [
-        {
-          item: {
-            categoria: {
-              nome: "asc",
-            },
-          },
-        },
-        {
-          item: {
-            nome: "asc",
-          },
-        },
-      ],
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(grupoItens);
-  } catch (error) {
-    console.error("Erro ao buscar itens marcados para comprar:", error);
-    res.status(500).json({ erro: "Erro ao buscar itens marcados para comprar" });
-  }
-});
-
-app.get("/grupo-itens/:id", exigirAutenticacao, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const grupoItem = await prisma.grupoItem.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    if (!grupoItem) {
-      return res.status(404).json({ erro: "Item do grupo não encontrado" });
-    }
-
-    res.json(grupoItem);
-  } catch (error) {
-    console.error("Erro ao buscar item do grupo:", error);
-    res.status(500).json({ erro: "Erro ao buscar item do grupo" });
-  }
-});
-
-app.post("/grupo-itens", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-    const { itemId, quantidade, comprar } = req.body;
-
-    const itemIdNumero = Number(itemId);
-    const quantidadeNumero = normalizarDecimal(quantidade);
-    const comprarBooleano = converterBoolean(comprar);
-
-    if (!Number.isInteger(itemIdNumero) || itemIdNumero <= 0) {
-      return res.status(400).json({ erro: "itemId inválido" });
-    }
-
-    const itemExiste = await prisma.item.findUnique({
-      where: { id: itemIdNumero },
-    });
-
-    if (!itemExiste) {
-      return res.status(404).json({ erro: "Item global não encontrado" });
-    }
-
-    const grupoItem = await prisma.grupoItem.create({
-      data: {
-        grupoId,
-        itemId: itemIdNumero,
-        quantidade: quantidadeNumero ?? 0,
-        comprar: comprarBooleano ?? false,
-      },
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.status(201).json(grupoItem);
-  } catch (error) {
-    console.error("Erro ao criar item do grupo:", error);
-
-    if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Esse item já está vinculado ao grupo" });
-    }
-
-    res.status(500).json({ erro: "Erro ao criar item do grupo" });
-  }
-});
-
-app.put("/grupo-itens/:id", exigirAutenticacao, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-    const { quantidade, comprar } = req.body;
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const grupoItemExistente = await prisma.grupoItem.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-    });
-
-    if (!grupoItemExistente) {
-      return res.status(404).json({ erro: "Item do grupo não encontrado" });
-    }
-
-    const dadosAtualizacao = {};
-
-    if (quantidade !== undefined) {
-      const quantidadeNumero = normalizarDecimal(quantidade);
-
-      if (quantidadeNumero === null || quantidadeNumero < 0) {
-        return res.status(400).json({ erro: "quantidade inválida" });
-      }
-
-      dadosAtualizacao.quantidade = quantidadeNumero;
-    }
-
-    if (comprar !== undefined) {
-      const comprarBooleano = converterBoolean(comprar);
-
-      if (comprarBooleano === null) {
-        return res.status(400).json({ erro: "comprar inválido" });
-      }
-
-      dadosAtualizacao.comprar = comprarBooleano;
-    }
-
-    const grupoItem = await prisma.grupoItem.update({
-      where: { id },
-      data: dadosAtualizacao,
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(grupoItem);
-  } catch (error) {
-    console.error("Erro ao atualizar item do grupo:", error);
-    res.status(500).json({ erro: "Erro ao atualizar item do grupo" });
-  }
-});
-
-app.patch("/grupo-itens/:id/comprar", exigirAutenticacao, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-    const comprarBooleano = converterBoolean(req.body.comprar);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (comprarBooleano === null) {
-      return res.status(400).json({ erro: "comprar inválido" });
-    }
-
-    const grupoItemExistente = await prisma.grupoItem.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-    });
-
-    if (!grupoItemExistente) {
-      return res.status(404).json({ erro: "Item do grupo não encontrado" });
-    }
-
-    const grupoItem = await prisma.grupoItem.update({
-      where: { id },
-      data: {
-        comprar: comprarBooleano,
-      },
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(grupoItem);
-  } catch (error) {
-    console.error("Erro ao atualizar flag comprar:", error);
-    res.status(500).json({ erro: "Erro ao atualizar flag comprar" });
-  }
-});
-
-app.patch("/grupo-itens/:id/quantidade", exigirAutenticacao, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-    const quantidadeNumero = normalizarDecimal(req.body.quantidade);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    if (quantidadeNumero === null || quantidadeNumero < 0) {
-      return res.status(400).json({ erro: "quantidade inválida" });
-    }
-
-    const grupoItemExistente = await prisma.grupoItem.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-    });
-
-    if (!grupoItemExistente) {
-      return res.status(404).json({ erro: "Item do grupo não encontrado" });
-    }
-
-    const grupoItem = await prisma.grupoItem.update({
-      where: { id },
-      data: {
-        quantidade: quantidadeNumero,
-      },
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    res.json(grupoItem);
-  } catch (error) {
-    console.error("Erro ao atualizar quantidade do item do grupo:", error);
-    res.status(500).json({ erro: "Erro ao atualizar quantidade do item do grupo" });
-  }
-});
-
-app.delete("/grupo-itens/:id", exigirAutenticacao, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const grupoId = obterGrupoIdSessao(req);
-
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ erro: "ID inválido" });
-    }
-
-    const grupoItemExistente = await prisma.grupoItem.findFirst({
-      where: {
-        id,
-        grupoId,
-      },
-    });
-
-    if (!grupoItemExistente) {
-      return res.status(404).json({ erro: "Item do grupo não encontrado" });
-    }
-
-    await prisma.grupoItem.delete({
-      where: { id },
-    });
-
-    res.json({ mensagem: "Item removido do grupo com sucesso" });
-  } catch (error) {
-    console.error("Erro ao excluir item do grupo:", error);
-    res.status(500).json({ erro: "Erro ao excluir item do grupo" });
-  }
-});
-
-
-/*
-  COMPRAS
-*/
-
-app.get("/compras", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const compras = await prisma.compra.findMany({
-      where: {
-        grupoId,
-      },
-      orderBy: {
-        criadoEm: "desc",
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-          },
-        },
-        compraItens: {
-          include: {
-            item: {
-              include: {
-                categoria: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    res.json(compras.map(normalizarCompraResposta));
-  } catch (error) {
-    console.error("Erro ao buscar compras:", error);
-    res.status(500).json({ erro: "Erro ao buscar compras" });
-  }
-});
-
-app.post("/compras", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-    const usuarioId = req.session.usuario?.id;
-    const itensRecebidos = Array.isArray(req.body?.itens) ? req.body.itens : [];
-
-    if (!Number.isInteger(grupoId) || grupoId <= 0) {
-      return res.status(400).json({ erro: "grupoId da sessão inválido" });
-    }
-
-    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
-      return res.status(400).json({ erro: "usuarioId da sessão inválido" });
-    }
-
-    if (itensRecebidos.length === 0) {
-      return res.status(400).json({ erro: "A compra deve ter ao menos um item" });
-    }
-
-    const itensNormalizados = itensRecebidos.map((item, indice) => ({
-      indice,
-      itemId:
-        Number.isInteger(Number(item?.itemId)) && Number(item?.itemId) > 0
-          ? Number(item.itemId)
-          : null,
-      nome: normalizarTextoSimples(item?.nome),
-      unidade: normalizarTextoSimples(item?.unidade),
-      categoria: normalizarTextoSimples(item?.categoria),
-      quantidade: normalizarDecimal(item?.quantidade),
-      valorUnitario: normalizarDecimal(item?.valorUnitario),
-    }));
-
-    for (const item of itensNormalizados) {
-      if (!item.nome) {
-        return res.status(400).json({ erro: `nome inválido no item da posição ${item.indice + 1}` });
-      }
-
-      if (!item.unidade) {
-        return res.status(400).json({ erro: `unidade inválida no item da posição ${item.indice + 1}` });
-      }
-
-      if (!item.categoria) {
-        return res.status(400).json({ erro: `categoria inválida no item da posição ${item.indice + 1}` });
-      }
-
-      if (item.quantidade === null || item.quantidade <= 0) {
-        return res.status(400).json({ erro: `quantidade inválida no item da posição ${item.indice + 1}` });
-      }
-
-      if (item.valorUnitario === null || item.valorUnitario < 0) {
-        return res.status(400).json({ erro: `valorUnitario inválido no item da posição ${item.indice + 1}` });
-      }
-    }
-
-    const resultado = await prisma.$transaction(async (tx) => {
-      const compra = await tx.compra.create({
-        data: {
-          grupoId,
-          usuarioId,
-        },
-      });
-
-      for (const item of itensNormalizados) {
-        let itemGlobal = null;
-
-        if (item.itemId) {
-          itemGlobal = await tx.item.findUnique({
-            where: { id: item.itemId },
-            include: { categoria: true },
-          });
-        }
-
-        if (!itemGlobal) {
-          itemGlobal = await tx.item.findFirst({
-            where: {
-              nome: item.nome,
-            },
-            include: { categoria: true },
-          });
-        }
-
-        let categoriaGlobal = itemGlobal?.categoria || null;
-
-        if (!categoriaGlobal) {
-          categoriaGlobal = await tx.categoria.findFirst({
-            where: {
-              nome: item.categoria,
-            },
-          });
-        }
-
-        if (!categoriaGlobal) {
-          categoriaGlobal = await tx.categoria.create({
-            data: {
-              nome: item.categoria,
-            },
-          });
-        }
-
-        if (!itemGlobal) {
-          itemGlobal = await tx.item.create({
-            data: {
-              nome: item.nome,
-              unidadePadrao: item.unidade,
-              categoriaId: categoriaGlobal.id,
-            },
-            include: { categoria: true },
-          });
-        }
-
-        await tx.compraItem.create({
-          data: {
-            compraId: compra.id,
-            itemId: itemGlobal.id,
-            nomeItem: itemGlobal.nome,
-            quantidade: item.quantidade,
-            unidade: item.unidade,
-            valorUnitario: item.valorUnitario,
-          },
-        });
-
-        const grupoItemExistente = await tx.grupoItem.findUnique({
-          where: {
-            grupoId_itemId: {
-              grupoId,
-              itemId: itemGlobal.id,
-            },
-          },
-        });
-
-        if (grupoItemExistente) {
-          await tx.grupoItem.update({
-            where: {
-              id: grupoItemExistente.id,
-            },
-            data: {
-              quantidade: Number(grupoItemExistente.quantidade) + Number(item.quantidade),
-              comprar: false,
-            },
-          });
-        } else {
-          await tx.grupoItem.create({
-            data: {
-              grupoId,
-              itemId: itemGlobal.id,
-              quantidade: item.quantidade,
-              comprar: false,
-            },
-          });
-        }
-
-        await tx.movimentacaoEstoque.create({
-          data: {
-            grupoId,
-            itemId: itemGlobal.id,
-            usuarioId,
-            tipo: "entrada_compra",
-            quantidade: item.quantidade,
-            motivo: `Compra #${compra.id}`,
-          },
-        });
-      }
-
-      const compraCompleta = await tx.compra.findUnique({
-        where: {
-          id: compra.id,
-        },
-        include: {
-          usuario: {
-            select: {
-              id: true,
-              nome: true,
-              email: true,
-            },
-          },
-          compraItens: {
-            include: {
-              item: {
-                include: {
-                  categoria: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      return normalizarCompraResposta(compraCompleta);
-    });
-
-    res.status(201).json(resultado);
-  } catch (error) {
-    console.error("Erro ao finalizar compra:", error);
-    res.status(500).json({ erro: "Erro ao finalizar compra" });
-  }
-});
-
-/*
-  MOVIMENTAÇÕES DE ESTOQUE
-*/
-
-app.get("/movimentacoes-estoque", exigirAutenticacao, async (req, res) => {
-  try {
-    const grupoId = obterGrupoIdSessao(req);
-
-    const movimentacoes = await prisma.movimentacaoEstoque.findMany({
-      where: {
-        grupoId,
-      },
-      orderBy: {
-        criadoEm: "desc",
-      },
-      include: {
-        item: {
-          include: {
-            categoria: true,
-          },
-        },
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-          },
-        },
-        grupo: true,
-      },
-    });
-
-    const movimentacoesNormalizadas = movimentacoes.map((movimentacao) => ({
-      ...movimentacao,
-      quantidade: decimalParaNumero(movimentacao.quantidade),
-    }));
-
-    res.json(movimentacoesNormalizadas);
-  } catch (error) {
-    console.error("Erro ao buscar movimentações de estoque:", error);
-    res.status(500).json({ erro: "Erro ao buscar movimentações de estoque" });
-  }
-});
-
-app.use(express.static(PUBLIC_PATH));
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(PUBLIC_PATH, "index.html"));
-});
-
-app.listen(3001, () => {
-  console.log("Servidor rodando na porta 3001");
-});
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compra | Controle de Compras</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="compra.css">
+</head>
+<body>
+  <header>
+    <nav class="site-map-top">
+      <div class="container py-2">
+        <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm d-lg-none"
+            id="btn-menu-mobile"
+            aria-label="Abrir menu de navegação"
+            aria-controls="menu-lateral-compra"
+            aria-expanded="false"
+          >
+            ☰ Menu
+          </button>
+
+          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
+          <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+          <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
+          <a href="compra.html" class="btn btn-primary btn-sm" aria-current="page">Compra</a>
+          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <aside
+    class="site-map-left"
+    id="menu-lateral-compra"
+    aria-label="Menu lateral"
+    aria-hidden="true"
+  >
+    <div class="site-map-left-hover-area" aria-hidden="true"></div>
+
+    <div
+      class="site-map-left-content"
+      id="menu-lateral-conteudo-compra"
+      tabindex="-1"
+    >
+      <div class="p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 d-lg-none">
+          <h2 class="h6 mb-0">Mapa do site</h2>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="btn-fechar-menu-mobile"
+            aria-label="Fechar menu de navegação"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <h2 class="h6 mb-3 d-none d-lg-block">Mapa do site</h2>
+
+        <div class="d-grid gap-2">
+          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
+          <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+          <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
+          <a href="compra.html" class="btn btn-primary btn-sm" aria-current="page">Compra</a>
+          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div
+    class="menu-mobile-backdrop d-lg-none"
+    id="menu-mobile-backdrop"
+    hidden
+    aria-hidden="true"
+  ></div>
+
+  <div class="container py-4">
+    <main>
+      <header class="mb-4">
+        <h1 class="h3 mb-1">Compra</h1>
+        <p class="text-muted mb-0">Registre compras reais e atualize o estoque do grupo.</p>
+      </header>
+
+      <section class="app-box mb-4" aria-labelledby="acoes-compra-titulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div>
+            <h2 class="h5 mb-1" id="acoes-compra-titulo">Montagem da compra</h2>
+            <p class="text-muted mb-0">Adicione itens, ajuste valores e finalize a compra.</p>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-bs-toggle="modal"
+              data-bs-target="#modalAdicionarCompra"
+            >
+              Adicionar item
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-success"
+              id="btn-finalizar-compra"
+            >
+              Finalizar compra
+            </button>
+          </div>
+        </div>
+
+        <div
+          id="compra-mensagem"
+          class="small mt-3"
+          aria-live="polite"
+          aria-atomic="true"
+          role="status"
+        ></div>
+      </section>
+
+      <section class="app-box mb-4" aria-labelledby="filtros-compra-titulo">
+        <h2 class="h5 mb-3" id="filtros-compra-titulo">Filtros e ordenação</h2>
+
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label for="filtro-item-compra" class="form-label">Filtrar por item</label>
+            <input
+              type="text"
+              class="form-control"
+              id="filtro-item-compra"
+              placeholder="Digite o nome do item"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="col-md-4">
+            <label for="filtro-categoria-compra" class="form-label">Filtrar por categoria</label>
+            <select class="form-select" id="filtro-categoria-compra">
+              <option value="">Todas as categorias</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label for="ordenacao-compra" class="form-label">Ordenar por</label>
+            <select class="form-select" id="ordenacao-compra">
+              <option value="item-asc">Item (A-Z)</option>
+              <option value="item-desc">Item (Z-A)</option>
+              <option value="quantidade-asc">Quantidade (menor-maior)</option>
+              <option value="quantidade-desc">Quantidade (maior-menor)</option>
+              <option value="categoria-asc">Categoria (A-Z)</option>
+              <option value="categoria-desc">Categoria (Z-A)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+          <div id="resumo-filtros-compra" class="d-flex flex-wrap gap-2"></div>
+
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <span id="contador-itens-compra" class="small text-muted">0 item(ns) exibido(s)</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-limpar-filtros-compra">
+              Limpar filtros
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="app-box" aria-labelledby="lista-compra-titulo">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+          <div>
+            <h2 class="h5 mb-1" id="lista-compra-titulo">Itens da compra</h2>
+            <p class="text-muted mb-0">Revise os itens antes de concluir.</p>
+          </div>
+
+          <div class="text-end">
+            <div class="small text-muted">Total da compra</div>
+            <div class="h5 mb-0" id="total-compra">R$ 0,00</div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover align-middle mb-0 tabela-compra">
+            <thead class="table-light">
+              <tr>
+                <th scope="col" class="cell-acoes">Ações</th>
+                <th
+                  scope="col"
+                  id="ordenar-coluna-item-compra"
+                  role="button"
+                  tabindex="0"
+                  class="sortable-header"
+                  aria-label="Ordenar por item"
+                  aria-sort="none"
+                >
+                  <span>Item</span> <span class="sort-indicator" aria-hidden="true">↕</span>
+                </th>
+                <th
+                  scope="col"
+                  id="ordenar-coluna-quantidade-compra"
+                  role="button"
+                  tabindex="0"
+                  class="sortable-header cell-quantidade"
+                  aria-label="Ordenar por quantidade"
+                  aria-sort="none"
+                >
+                  <span>Quantidade</span> <span class="sort-indicator" aria-hidden="true">↕</span>
+                </th>
+                <th scope="col">Unidade</th>
+                <th
+                  scope="col"
+                  id="ordenar-coluna-categoria-compra"
+                  role="button"
+                  tabindex="0"
+                  class="sortable-header"
+                  aria-label="Ordenar por categoria"
+                  aria-sort="none"
+                >
+                  <span>Categoria</span> <span class="sort-indicator" aria-hidden="true">↕</span>
+                </th>
+                <th scope="col">Valor unitário</th>
+                <th scope="col">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="compra-tabela">
+              <tr id="compra-estado-vazio">
+                <td colspan="7" class="text-center text-muted empty-state">
+                  Nenhuma compra montada até o momento.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <template id="template-linha-compra">
+        <tr>
+          <td class="cell-acoes">
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm btn-editar-compra">Editar</button>
+              <button type="button" class="btn btn-outline-danger btn-sm btn-excluir-compra">Excluir</button>
+            </div>
+          </td>
+          <td class="item-nome"></td>
+          <td class="item-quantidade cell-quantidade"></td>
+          <td class="item-unidade"></td>
+          <td class="item-categoria"></td>
+          <td class="item-valor-unitario"></td>
+          <td class="item-subtotal"></td>
+        </tr>
+      </template>
+    </main>
+  </div>
+
+  <div
+    class="modal fade"
+    id="modalAdicionarCompra"
+    tabindex="-1"
+    aria-labelledby="modalAdicionarCompraLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5 mb-0" id="modalAdicionarCompraLabel">Adicionar item à compra</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+
+        <div class="modal-body">
+          <form id="compra-form" novalidate>
+            <div class="row g-3">
+              <div class="col-md-6 position-relative">
+                <label for="item-compra" class="form-label">Item</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="item-compra"
+                  placeholder="Digite o nome do item"
+                  autocomplete="off"
+                  required
+                >
+                <div
+                  id="sugestoes-item-compra"
+                  class="list-group position-absolute w-100 mt-1 shadow-sm z-3"
+                  aria-live="polite"
+                ></div>
+              </div>
+
+              <div class="col-md-3">
+                <label for="quantidade-compra" class="form-label">Quantidade</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="quantidade-compra"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0"
+                  required
+                >
+              </div>
+
+              <div class="col-md-3">
+                <label for="unidade-compra" class="form-label">Unidade</label>
+                <select class="form-select" id="unidade-compra" required>
+                  <option value="unidade(s)">unidade(s)</option>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="l">l</option>
+                  <option value="ml">ml</option>
+                  <option value="caixa(s)">caixa(s)</option>
+                  <option value="pacote(s)">pacote(s)</option>
+                  <option value="outro(s)">Outro</option>
+                </select>
+              </div>
+
+              <div class="col-md-6 d-none" id="unidade-outra-wrapper">
+                <label for="unidade-outra-compra" class="form-label">Outra unidade</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="unidade-outra-compra"
+                  placeholder="Digite a unidade"
+                >
+              </div>
+
+              <div class="col-md-6">
+                <label for="categoria-compra" class="form-label">Categoria</label>
+                <select class="form-select" id="categoria-compra" required>
+                  <option value="">Selecione a categoria</option>
+                </select>
+              </div>
+
+              <div class="col-md-6 d-none" id="nova-categoria-wrapper">
+                <label for="nova-categoria-compra" class="form-label">Nova categoria</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="nova-categoria-compra"
+                  placeholder="Digite a categoria"
+                >
+              </div>
+
+              <div class="col-md-6">
+                <label for="valor-unitario-compra" class="form-label">Valor unitário</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="valor-unitario-compra"
+                  min="0"
+                  step="0.01"
+                  placeholder="0,00"
+                  required
+                >
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" id="btn-limpar-item-compra">
+            Limpar
+          </button>
+          <button type="submit" class="btn btn-primary" id="btn-salvar-item-compra" form="compra-form">
+            Salvar compra
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-map-bottom mt-4">
+    <div class="container py-3">
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
+        <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
+        <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
+        <a href="compra.html" class="btn btn-primary btn-sm" aria-current="page">Compra</a>
+        <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  <script src="compra.js" defer></script>
+</body>
+</html>
