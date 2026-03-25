@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", function () {
   async function inicializar() {
     try {
       const sessao = await verificarSessao();
-      papelAtual = String(sessao.usuario.papel || "").toLowerCase();
+      papelAtual = String(sessao.usuario?.papel || "").toLowerCase();
       await carregarPerfil();
       await carregarMembros();
       await carregarSolicitacoes();
@@ -99,11 +99,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
     membros.forEach(function (membro) {
       const tr = document.createElement("tr");
+      const usuario = membro.usuario || {};
+      const nome = obterNomeUsuario(usuario, membro);
+      const email = usuario.email || membro.email || "-";
+      const papel = membro.papel || usuario.papel || "-";
+      const status = membro.status || membro.statusGrupo || usuario.statusGrupo || "-";
+
       tr.innerHTML = `
-        <td>${escapar(membro.nome || "-")}</td>
-        <td>${escapar(membro.email || "-")}</td>
-        <td>${escapar(membro.papel || "-")}</td>
-        <td>${escapar(membro.status || membro.statusGrupo || "-")}</td>
+        <td>${escapar(nome)}</td>
+        <td>${escapar(email)}</td>
+        <td>${escapar(papel)}</td>
+        <td>${escapar(status)}</td>
       `;
       perfilMembros.appendChild(tr);
     });
@@ -130,6 +136,10 @@ document.addEventListener("DOMContentLoaded", function () {
       throw new Error(dados.erro || "Falha ao carregar solicitações.");
     }
 
+    if (perfilAdminAviso) {
+      perfilAdminAviso.textContent = "";
+    }
+
     const solicitacoes = Array.isArray(dados) ? dados : dados.solicitacoes || [];
     perfilSolicitacoes.innerHTML = "";
 
@@ -140,12 +150,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
     solicitacoes.forEach(function (solicitacao) {
       const tr = document.createElement("tr");
+      const usuario = solicitacao.usuario || {};
       const id = Number(solicitacao.id);
+      const nome = obterNomeUsuario(usuario, solicitacao);
+      const email = usuario.email || solicitacao.email || "-";
+      const papel = solicitacao.papel || usuario.papel || "membro";
+      const status = solicitacao.status || solicitacao.statusGrupo || usuario.statusGrupo || "pendente";
+
       tr.innerHTML = `
-        <td>${escapar(solicitacao.nome || "-")}</td>
-        <td>${escapar(solicitacao.email || "-")}</td>
-        <td>${escapar(solicitacao.papel || "membro")}</td>
-        <td>${escapar(solicitacao.status || solicitacao.statusGrupo || "pendente")}</td>
+        <td>${escapar(nome)}</td>
+        <td>${escapar(email)}</td>
+        <td>${escapar(papel)}</td>
+        <td>${escapar(status)}</td>
         <td class="text-end">
           <div class="d-flex justify-content-end gap-2">
             <button type="button" class="btn btn-sm btn-success" data-acao="aceitar" data-id="${id}">Aceitar</button>
@@ -200,6 +216,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  function obterNomeUsuario(usuario, fallback) {
+    const nomeCompletoUsuario = [usuario.nome, usuario.sobrenome]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    if (nomeCompletoUsuario) {
+      return nomeCompletoUsuario;
+    }
+
+    const nomeCompletoFallback = [fallback?.nome, fallback?.sobrenome]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    return nomeCompletoFallback || fallback?.nome || "-";
+  }
+
   function exibirMensagem(texto, variante) {
     if (!perfilMessage) return;
     perfilMessage.className = `small mt-3 text-${variante}`;
@@ -218,6 +252,10 @@ document.addEventListener("DOMContentLoaded", function () {
   async function lerJsonSeguro(resposta) {
     const texto = await resposta.text();
     if (!texto) return {};
-    try { return JSON.parse(texto); } catch { return {}; }
+    try {
+      return JSON.parse(texto);
+    } catch {
+      return {};
+    }
   }
 });
