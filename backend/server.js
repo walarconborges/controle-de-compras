@@ -1949,6 +1949,17 @@ app.get("/", (req, res) => {
 const PORTA = Number(process.env.PORT) || 3001;
 const HOST = "0.0.0.0";
 
+app.get("/health", (req, res) => {
+  res.status(200).send("ok");
+});
+
+const PORTA = Number(process.env.PORT) || 3001;
+const HOST = "0.0.0.0";
+
+app.listen(PORTA, HOST, () => {
+  console.log(`Servidor rodando em ${HOST}:${PORTA}`);
+});
+
 app.listen(PORTA, HOST, () => {
   console.log(`Servidor rodando em ${HOST}:${PORTA}`);
 });
