@@ -1744,39 +1744,85 @@ app.get("/grupo-itens/:id", exigirAutenticacao, async (req, res) => {
 app.post("/grupo-itens", exigirAutenticacao, async (req, res) => {
   try {
     const grupoId = obterGrupoIdSessao(req);
-    const { itemId, quantidade, comprar } = req.body;
+    const itemIdNumero = Number.isInteger(Number(req.body?.itemId)) && Number(req.body?.itemId) > 0
+      ? Number(req.body.itemId)
+      : null;
+    const nome = normalizarTextoSimples(req.body?.nome);
+    const unidade = normalizarTextoSimples(req.body?.unidade);
+    const categoria = normalizarTextoSimples(req.body?.categoria);
+    const quantidadeNumero = normalizarDecimal(req.body?.quantidade);
+    const comprarBooleano = converterBoolean(req.body?.comprar);
 
-    const itemIdNumero = Number(itemId);
-    const quantidadeNumero = normalizarDecimal(quantidade);
-    const comprarBooleano = converterBoolean(comprar);
-
-    if (!Number.isInteger(itemIdNumero) || itemIdNumero <= 0) {
-      return res.status(400).json({ erro: "itemId inválido" });
+    if (!Number.isInteger(grupoId) || grupoId <= 0) {
+      return res.status(400).json({ erro: "grupoId da sessão inválido" });
     }
 
-    const itemExiste = await prisma.item.findUnique({
-      where: { id: itemIdNumero },
-    });
-
-    if (!itemExiste) {
-      return res.status(404).json({ erro: "Item global não encontrado" });
+    if (quantidadeNumero === null || quantidadeNumero < 0) {
+      return res.status(400).json({ erro: "quantidade inválida" });
     }
 
-    const grupoItem = await prisma.grupoItem.create({
-      data: {
-        grupoId,
+    if (itemIdNumero === null) {
+      if (!nome) {
+        return res.status(400).json({ erro: "nome inválido" });
+      }
+
+      if (!unidade) {
+        return res.status(400).json({ erro: "unidade inválida" });
+      }
+
+      if (!categoria) {
+        return res.status(400).json({ erro: "categoria inválida" });
+      }
+    }
+
+    const grupoItem = await prisma.$transaction(async (tx) => {
+      const itemGlobal = await encontrarOuCriarItemTx(tx, {
         itemId: itemIdNumero,
-        quantidade: quantidadeNumero ?? 0,
-        comprar: comprarBooleano ?? false,
-      },
-      include: {
-        item: {
-          include: {
-            categoria: true,
+        nome,
+        unidade,
+        categoriaNome: categoria,
+      });
+
+      const grupoItemExistente = await tx.grupoItem.findUnique({
+        where: {
+          grupoId_itemId: {
+            grupoId,
+            itemId: itemGlobal.id,
           },
         },
-        grupo: true,
-      },
+        include: {
+          item: {
+            include: {
+              categoria: true,
+            },
+          },
+          grupo: true,
+        },
+      });
+
+      if (grupoItemExistente) {
+        throw new Prisma.PrismaClientKnownRequestError(
+          "Esse item já está vinculado ao grupo",
+          { code: "P2002", clientVersion: Prisma.prismaVersion.client }
+        );
+      }
+
+      return tx.grupoItem.create({
+        data: {
+          grupoId,
+          itemId: itemGlobal.id,
+          quantidade: quantidadeNumero,
+          comprar: comprarBooleano ?? quantidadeNumero <= 0,
+        },
+        include: {
+          item: {
+            include: {
+              categoria: true,
+            },
+          },
+          grupo: true,
+        },
+      });
     });
 
     res.status(201).json(grupoItem);

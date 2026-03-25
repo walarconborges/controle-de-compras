@@ -380,7 +380,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const dados = await lerJsonSeguro(resposta);
 
         if (!resposta.ok) {
-          exibirMensagem(dados.erro || "Não foi possível adicionar o item ao estoque.", "danger");
+          exibirMensagem(dados.erro || "Não foi possível adicionar o item ao estoque.", resposta.status === 409 ? "warning" : "danger");
           return;
         }
 
