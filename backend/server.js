@@ -142,6 +142,69 @@ function normalizarEmail(valor) {
   return String(valor || "").trim().toLowerCase();
 }
 
+function normalizarNomeGrupo(valor) {
+  return String(valor || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function nomeGrupoEhValido(nomeGrupo) {
+  return !!nomeGrupo && !/\s/.test(nomeGrupo);
+}
+
+function gerarCodigoGrupo(nomeGrupo, grupoId) {
+  return `${String(nomeGrupo || "").trim()}-${grupoId}`.toUpperCase();
+}
+
+async function montarSessaoUsuarioPorUsuarioId(usuarioId) {
+  const usuarioNumero = Number(usuarioId);
+
+  if (!Number.isInteger(usuarioNumero) || usuarioNumero <= 0) {
+    return null;
+  }
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: usuarioNumero },
+    include: {
+      usuariosGrupos: {
+        orderBy: { id: "asc" },
+        include: {
+          grupo: true,
+        },
+      },
+    },
+  });
+
+  if (!usuario || !usuario.usuariosGrupos.length) {
+    return null;
+  }
+
+  const vinculo = usuario.usuariosGrupos[0];
+
+  return {
+    id: usuario.id,
+    nome: usuario.nome,
+    email: usuario.email,
+    grupoId: vinculo.grupoId,
+    grupoNome: vinculo.grupo?.nome || null,
+    grupoCodigo: vinculo.grupo?.codigo || null,
+    papel: vinculo.papel,
+    statusGrupo: vinculo.status,
+  };
+}
+
+async function atualizarSessaoUsuario(req, usuarioId) {
+  const sessaoUsuario = await montarSessaoUsuarioPorUsuarioId(usuarioId);
+
+  if (!sessaoUsuario) {
+    req.session.usuario = null;
+    return null;
+  }
+
+  req.session.usuario = sessaoUsuario;
+  return sessaoUsuario;
+}
+
 function decimalParaNumero(valor) {
   if (valor === null || valor === undefined) {
     return null;
@@ -517,14 +580,23 @@ app.get("/grupos/:id", exigirAutenticacao, async (req, res) => {
 
 app.post("/grupos", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
   try {
-    const { nome } = req.body;
+    const nome = normalizarNomeGrupo(req.body?.nome);
 
-    if (!nome || !nome.trim()) {
+    if (!nome) {
       return res.status(400).json({ erro: "O nome do grupo é obrigatório" });
     }
 
-    const grupo = await prisma.grupo.create({
-      data: { nome: nome.trim() },
+    if (!nomeGrupoEhValido(nome)) {
+      return res.status(400).json({ erro: "O nome do grupo deve conter apenas 1 palavra" });
+    }
+
+    const grupoCriado = await prisma.grupo.create({
+      data: { nome, codigo: "TEMP" },
+    });
+
+    const grupo = await prisma.grupo.update({
+      where: { id: grupoCriado.id },
+      data: { codigo: gerarCodigoGrupo(grupoCriado.nome, grupoCriado.id) },
     });
 
     res.status(201).json(grupo);
@@ -835,12 +907,46 @@ app.delete("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), async (req
   }
 });
 
+app.get("/grupos/sugestoes", async (req, res) => {
+  try {
+    const termo = normalizarNomeGrupo(req.query?.termo);
+
+    if (!termo || termo.length < 1) {
+      return res.json([]);
+    }
+
+    const grupos = await prisma.grupo.findMany({
+      where: {
+        nome: {
+          contains: termo,
+          mode: "insensitive",
+        },
+      },
+      orderBy: {
+        nome: "asc",
+      },
+      take: 8,
+      select: {
+        id: true,
+        nome: true,
+        codigo: true,
+      },
+    });
+
+    res.json(grupos);
+  } catch (error) {
+    console.error("Erro ao buscar sugestões de grupos:", error);
+    res.status(500).json({ erro: "Erro ao buscar sugestões de grupos" });
+  }
+});
+
 app.post("/cadastro", async (req, res) => {
   try {
     const nome = normalizarTextoSimples(req.body?.nome);
     const sobrenome = normalizarTextoSimples(req.body?.sobrenome);
     const email = normalizarEmail(req.body?.email);
     const senha = normalizarTextoSimples(req.body?.senha);
+    const grupoNome = normalizarNomeGrupo(req.body?.grupoNome);
 
     if (!nome) {
       return res.status(400).json({ erro: "O nome é obrigatório" });
@@ -862,6 +968,10 @@ app.post("/cadastro", async (req, res) => {
       return res.status(400).json({ erro: "A senha deve ter pelo menos 6 caracteres" });
     }
 
+    if (!nomeGrupoEhValido(grupoNome)) {
+      return res.status(400).json({ erro: "O nome do grupo deve conter apenas 1 palavra" });
+    }
+
     const senhaHash = await bcrypt.hash(senha, 10);
     const nomeCompleto = `${nome} ${sobrenome}`.trim();
 
@@ -875,40 +985,71 @@ app.post("/cadastro", async (req, res) => {
         },
       });
 
-      const grupo = await tx.grupo.create({
-        data: {
-          nome: `Grupo de ${nomeCompleto}`,
-        },
+      const grupoExistente = await tx.grupo.findUnique({
+        where: { nome: grupoNome },
       });
+
+      if (!grupoExistente) {
+        const grupoCriado = await tx.grupo.create({
+          data: {
+            nome: grupoNome,
+            codigo: "TEMP",
+          },
+        });
+
+        const grupoAtualizado = await tx.grupo.update({
+          where: { id: grupoCriado.id },
+          data: {
+            codigo: gerarCodigoGrupo(grupoCriado.nome, grupoCriado.id),
+          },
+        });
+
+        const vinculo = await tx.usuarioGrupo.create({
+          data: {
+            usuarioId: usuario.id,
+            grupoId: grupoAtualizado.id,
+            papel: "admin",
+            status: "aceito",
+            aprovadoEm: new Date(),
+          },
+        });
+
+        return {
+          usuario,
+          grupo: grupoAtualizado,
+          vinculo,
+          mensagem: "Cadastro realizado com sucesso",
+        };
+      }
 
       const vinculo = await tx.usuarioGrupo.create({
         data: {
           usuarioId: usuario.id,
-          grupoId: grupo.id,
-          papel: "admin",
+          grupoId: grupoExistente.id,
+          papel: "membro",
+          status: "pendente",
         },
       });
 
-      return { usuario, grupo, vinculo };
+      return {
+        usuario,
+        grupo: grupoExistente,
+        vinculo,
+        mensagem: "Cadastro realizado. Aguarde aprovação do administrador do grupo",
+      };
     });
 
-    req.session.usuario = {
-      id: resultado.usuario.id,
-      nome: resultado.usuario.nome,
-      email: resultado.usuario.email,
-      grupoId: resultado.grupo.id,
-      papel: resultado.vinculo.papel,
-    };
+    const sessaoUsuario = await atualizarSessaoUsuario(req, resultado.usuario.id);
 
     res.status(201).json({
-      mensagem: "Cadastro realizado com sucesso",
-      usuario: req.session.usuario,
+      mensagem: resultado.mensagem,
+      usuario: sessaoUsuario,
     });
   } catch (error) {
     console.error("Erro ao realizar cadastro:", error);
 
     if (error.code === "P2002") {
-      return res.status(409).json({ erro: "Já existe um usuário com esse email" });
+      return res.status(409).json({ erro: "Já existe um usuário com esse nome ou email" });
     }
 
     res.status(500).json({ erro: "Erro ao realizar cadastro" });
@@ -950,30 +1091,15 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ erro: "Credenciais inválidas" });
     }
 
-    const vinculo = await prisma.usuarioGrupo.findFirst({
-      where: {
-        usuarioId: usuario.id,
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
+    const sessaoUsuario = await atualizarSessaoUsuario(req, usuario.id);
 
-    if (!vinculo) {
+    if (!sessaoUsuario) {
       return res.status(403).json({ erro: "Usuário sem vínculo com grupo" });
     }
 
-    req.session.usuario = {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      grupoId: vinculo.grupoId,
-      papel: vinculo.papel,
-    };
-
     res.json({
       mensagem: "Login realizado com sucesso",
-      usuario: req.session.usuario,
+      usuario: sessaoUsuario,
     });
   } catch (error) {
     console.error("Erro ao fazer login:", error);
@@ -981,8 +1107,195 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.get("/sessao", exigirAutenticacao, (req, res) => {
-  res.json({ usuario: req.session.usuario });
+app.get("/sessao", exigirAutenticacao, async (req, res) => {
+  try {
+    const sessaoAtualizada = await atualizarSessaoUsuario(req, req.session.usuario.id);
+    res.json({ usuario: sessaoAtualizada });
+  } catch (error) {
+    console.error("Erro ao carregar sessão:", error);
+    res.status(500).json({ erro: "Erro ao carregar sessão" });
+  }
+});
+
+app.get("/meu-status-grupo", exigirAutenticacao, async (req, res) => {
+  try {
+    const sessaoAtualizada = await atualizarSessaoUsuario(req, req.session.usuario.id);
+    res.json({
+      status: sessaoAtualizada?.statusGrupo || null,
+      papel: sessaoAtualizada?.papel || null,
+      grupoId: sessaoAtualizada?.grupoId || null,
+      grupoNome: sessaoAtualizada?.grupoNome || null,
+      grupoCodigo: sessaoAtualizada?.grupoCodigo || null,
+    });
+  } catch (error) {
+    console.error("Erro ao carregar status do grupo:", error);
+    res.status(500).json({ erro: "Erro ao carregar status do grupo" });
+  }
+});
+
+app.get("/meu-perfil", exigirAutenticacao, async (req, res) => {
+  try {
+    const sessaoAtualizada = await atualizarSessaoUsuario(req, req.session.usuario.id);
+    const vinculo = await prisma.usuarioGrupo.findFirst({
+      where: {
+        usuarioId: sessaoAtualizada.id,
+        grupoId: sessaoAtualizada.grupoId,
+      },
+      include: {
+        grupo: true,
+      },
+    });
+
+    res.json({
+      id: sessaoAtualizada.id,
+      nome: sessaoAtualizada.nome,
+      email: sessaoAtualizada.email,
+      papel: sessaoAtualizada.papel,
+      statusGrupo: sessaoAtualizada.statusGrupo,
+      grupoId: sessaoAtualizada.grupoId,
+      grupoNome: sessaoAtualizada.grupoNome,
+      grupoCodigo: sessaoAtualizada.grupoCodigo,
+      solicitadoEm: vinculo?.solicitadoEm || null,
+      aprovadoEm: vinculo?.aprovadoEm || null,
+    });
+  } catch (error) {
+    console.error("Erro ao carregar perfil:", error);
+    res.status(500).json({ erro: "Erro ao carregar perfil" });
+  }
+});
+
+app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res) => {
+  try {
+    const grupoId = obterGrupoIdSessao(req);
+
+    const vinculos = await prisma.usuarioGrupo.findMany({
+      where: { grupoId },
+      orderBy: [{ status: "asc" }, { papel: "asc" }, { id: "asc" }],
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            ativo: true,
+          },
+        },
+      },
+    });
+
+    res.json(vinculos);
+  } catch (error) {
+    console.error("Erro ao carregar membros do grupo:", error);
+    res.status(500).json({ erro: "Erro ao carregar membros do grupo" });
+  }
+});
+
+app.get("/meu-grupo/solicitacoes", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
+  try {
+    const grupoId = obterGrupoIdSessao(req);
+
+    const solicitacoes = await prisma.usuarioGrupo.findMany({
+      where: {
+        grupoId,
+        status: "pendente",
+      },
+      orderBy: { id: "asc" },
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            ativo: true,
+          },
+        },
+      },
+    });
+
+    res.json(solicitacoes);
+  } catch (error) {
+    console.error("Erro ao carregar solicitações do grupo:", error);
+    res.status(500).json({ erro: "Erro ao carregar solicitações do grupo" });
+  }
+});
+
+app.patch("/meu-grupo/solicitacoes/:id/aceitar", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const grupoId = obterGrupoIdSessao(req);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ erro: "ID inválido" });
+    }
+
+    const vinculo = await prisma.usuarioGrupo.findFirst({
+      where: {
+        id,
+        grupoId,
+      },
+    });
+
+    if (!vinculo) {
+      return res.status(404).json({ erro: "Solicitação não encontrada" });
+    }
+
+    const atualizado = await prisma.usuarioGrupo.update({
+      where: { id },
+      data: {
+        status: "aceito",
+        aprovadoEm: new Date(),
+      },
+      include: {
+        usuario: {
+          select: { id: true, nome: true, email: true, ativo: true },
+        },
+      },
+    });
+
+    res.json(atualizado);
+  } catch (error) {
+    console.error("Erro ao aceitar solicitação:", error);
+    res.status(500).json({ erro: "Erro ao aceitar solicitação" });
+  }
+});
+
+app.patch("/meu-grupo/solicitacoes/:id/recusar", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const grupoId = obterGrupoIdSessao(req);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ erro: "ID inválido" });
+    }
+
+    const vinculo = await prisma.usuarioGrupo.findFirst({
+      where: {
+        id,
+        grupoId,
+      },
+    });
+
+    if (!vinculo) {
+      return res.status(404).json({ erro: "Solicitação não encontrada" });
+    }
+
+    const atualizado = await prisma.usuarioGrupo.update({
+      where: { id },
+      data: {
+        status: "recusado",
+      },
+      include: {
+        usuario: {
+          select: { id: true, nome: true, email: true, ativo: true },
+        },
+      },
+    });
+
+    res.json(atualizado);
+  } catch (error) {
+    console.error("Erro ao recusar solicitação:", error);
+    res.status(500).json({ erro: "Erro ao recusar solicitação" });
+  }
 });
 
 app.post("/logout", (req, res) => {
@@ -1096,6 +1409,8 @@ app.post("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (re
         usuarioId: usuarioIdNumero,
         grupoId: grupoIdNumero,
         papel: papel.trim(),
+        status: "aceito",
+        aprovadoEm: new Date(),
       },
       include: {
         usuario: {

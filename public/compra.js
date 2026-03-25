@@ -265,8 +265,16 @@ document.addEventListener("DOMContentLoaded", function () {
         window.location.replace("index.html");
         throw new Error("Usuário não encontrado na sessão");
       }
+
+      const statusGrupo = String(dados.usuario.statusGrupo || "").toLowerCase();
+      if (statusGrupo && statusGrupo !== "aceito") {
+        window.location.replace("aguardando.html");
+        throw new Error("Usuário ainda não foi aceito no grupo");
+      }
     } catch (error) {
-      window.location.replace("index.html");
+      if (!String(error.message || "").includes("aceito no grupo")) {
+        window.location.replace("index.html");
+      }
       throw error;
     }
   }

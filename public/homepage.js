@@ -18,16 +18,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function abrirMenu() {
     ultimoElementoFocado = document.activeElement;
-
     menu.classList.add("is-open");
     menuContent.classList.add("is-open");
     menu.setAttribute("aria-hidden", "false");
     backdrop.hidden = false;
-
-    if (btnAbrir) {
-      btnAbrir.setAttribute("aria-expanded", "true");
-    }
-
+    if (btnAbrir) btnAbrir.setAttribute("aria-expanded", "true");
     document.body.classList.add("menu-mobile-open");
     menuContent.focus();
   }
@@ -37,56 +32,28 @@ document.addEventListener("DOMContentLoaded", function () {
     menuContent.classList.remove("is-open");
     menu.setAttribute("aria-hidden", "true");
     backdrop.hidden = true;
-
-    if (btnAbrir) {
-      btnAbrir.setAttribute("aria-expanded", "false");
-    }
-
+    if (btnAbrir) btnAbrir.setAttribute("aria-expanded", "false");
     document.body.classList.remove("menu-mobile-open");
-
     if (ultimoElementoFocado && typeof ultimoElementoFocado.focus === "function") {
       ultimoElementoFocado.focus();
     }
   }
 
-  if (btnAbrir) {
-    btnAbrir.addEventListener("click", abrirMenu);
-  }
-
-  if (btnFechar) {
-    btnFechar.addEventListener("click", fecharMenu);
-  }
-
+  if (btnAbrir) btnAbrir.addEventListener("click", abrirMenu);
+  if (btnFechar) btnFechar.addEventListener("click", fecharMenu);
   backdrop.addEventListener("click", fecharMenu);
-
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") {
-      fecharMenu();
-    }
-  });
-
-  window.addEventListener("resize", function () {
-    if (window.innerWidth >= 992) {
-      fecharMenu();
-    }
-  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") fecharMenu(); });
+  window.addEventListener("resize", () => { if (window.innerWidth >= 992) fecharMenu(); });
 
   btnLogout.addEventListener("click", async function () {
     try {
       definirEstadoLogout(true);
-
       const resposta = await fetch("/logout", {
         method: "POST",
         credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
-
-      if (!resposta.ok) {
-        throw new Error("Falha ao fazer logout");
-      }
-
+      if (!resposta.ok) throw new Error("Falha ao fazer logout");
       window.location.replace("index.html");
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
@@ -100,25 +67,19 @@ document.addEventListener("DOMContentLoaded", function () {
       const resposta = await fetch("/sessao", {
         method: "GET",
         credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
-
       if (!resposta.ok) {
         window.location.replace("index.html");
         return;
       }
-
       const dados = await lerJsonSeguro(resposta);
       const usuario = dados.usuario;
-
       if (!usuario) {
         window.location.replace("index.html");
         return;
       }
-
-      usuarioLogado.textContent = montarTextoUsuario(usuario);
+      usuarioLogado.textContent = `${usuario.nome || "Usuário"} | ${usuario.email || "sem e-mail"}`;
       preencherSessaoInfo(usuario);
     } catch (error) {
       console.error("Erro ao verificar sessão:", error);
@@ -126,43 +87,31 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  async function lerJsonSeguro(resposta) {
-    try {
-      return await resposta.json();
-    } catch {
-      return {};
-    }
-  }
-
-  function montarTextoUsuario(usuario) {
-    const nome = usuario.nome || "Usuário";
-    const email = usuario.email || "sem e-mail";
-    return `${nome} | ${email}`;
-  }
-
   function preencherSessaoInfo(usuario) {
     sessaoInfo.textContent = "";
-
     const campos = [
       ["Usuário", usuario.nome || "Não informado"],
       ["E-mail", usuario.email || "Não informado"],
+      ["Grupo", usuario.grupoNome || "Não informado"],
+      ["Código do grupo", usuario.grupoCodigo || "Não informado"],
       ["Grupo ID", usuario.grupoId ?? "Não informado"],
       ["Papel", usuario.papel || "Não informado"],
+      ["Status no grupo", usuario.statusGrupo || "Não informado"],
     ];
-
     for (const [rotulo, valor] of campos) {
       const linha = document.createElement("div");
-
       const strong = document.createElement("strong");
       strong.textContent = `${rotulo}: `;
-
       const span = document.createElement("span");
       span.textContent = String(valor);
-
       linha.appendChild(strong);
       linha.appendChild(span);
       sessaoInfo.appendChild(linha);
     }
+  }
+
+  async function lerJsonSeguro(resposta) {
+    try { return await resposta.json(); } catch { return {}; }
   }
 
   function definirEstadoLogout(saindo) {

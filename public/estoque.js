@@ -252,8 +252,16 @@ document.addEventListener("DOMContentLoaded", function () {
         window.location.replace("index.html");
         throw new Error("Usuário não encontrado na sessão");
       }
+
+      const statusGrupo = String(dados.usuario.statusGrupo || "").toLowerCase();
+      if (statusGrupo && statusGrupo !== "aceito") {
+        window.location.replace("aguardando.html");
+        throw new Error("Usuário ainda não foi aceito no grupo");
+      }
     } catch (error) {
-      window.location.replace("index.html");
+      if (!String(error.message || "").includes("aceito no grupo")) {
+        window.location.replace("index.html");
+      }
       throw error;
     }
   }
@@ -326,15 +334,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const itemGlobal = buscarItemGlobalPorNome(nome);
 
-    if (!itemGlobal) {
-      exibirMensagem(
-        "Esse item global ainda não existe. Cadastre o item global antes de adicioná-lo ao estoque do grupo.",
-        "warning"
-      );
-      campoNome.focus();
-      return;
-    }
-
     try {
       definirEstadoSalvamento(true);
 
@@ -342,13 +341,30 @@ document.addEventListener("DOMContentLoaded", function () {
         await atualizarQuantidade(idEdicao, quantidade);
         exibirMensagem("Quantidade do item atualizada com sucesso.", "success");
       } else {
-        const itemJaExisteNoGrupo = itensEstoque.some(function (item) {
-          return Number(item.itemId) === Number(itemGlobal.id);
-        });
+        const itemJaExisteNoGrupo = itemGlobal
+          ? itensEstoque.some(function (item) {
+              return Number(item.itemId) === Number(itemGlobal.id);
+            })
+          : itensEstoque.some(function (item) {
+              return normalizarTexto(item.nome) === normalizarTexto(nome);
+            });
 
         if (itemJaExisteNoGrupo) {
           exibirMensagem("Esse item já está no estoque do grupo. Use Editar para alterar a quantidade.", "warning");
           return;
+        }
+
+        const corpo = {
+          quantidade: quantidade,
+          comprar: quantidade <= 0
+        };
+
+        if (itemGlobal && itemGlobal.id) {
+          corpo.itemId = Number(itemGlobal.id);
+        } else {
+          corpo.nome = nome;
+          corpo.unidade = unidade;
+          corpo.categoria = categoria;
         }
 
         const resposta = await fetch("/grupo-itens", {
@@ -358,11 +374,7 @@ document.addEventListener("DOMContentLoaded", function () {
             Accept: "application/json"
           },
           credentials: "include",
-          body: JSON.stringify({
-            itemId: Number(itemGlobal.id),
-            quantidade: quantidade,
-            comprar: quantidade <= 0
-          })
+          body: JSON.stringify(corpo)
         });
 
         const dados = await lerJsonSeguro(resposta);

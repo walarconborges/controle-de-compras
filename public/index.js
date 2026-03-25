@@ -10,9 +10,14 @@ document.addEventListener("DOMContentLoaded", function () {
   const cadastroSobrenomeInput = document.getElementById("cadastro-sobrenome");
   const cadastroEmailInput = document.getElementById("cadastro-email");
   const cadastroSenhaInput = document.getElementById("cadastro-senha");
+  const cadastroGrupoInput = document.getElementById("cadastro-grupo");
+  const cadastroSugestoesGrupo = document.getElementById("cadastro-sugestoes-grupo");
   const cadastroMessage = document.getElementById("cadastro-message");
   const btnCadastrar = document.getElementById("btn-cadastrar");
   const cadastroModalElement = document.getElementById("cadastroModal");
+
+  let ultimoTermoBuscado = "";
+  let controladorSugestoes = null;
 
   const cadastroModal =
     cadastroModalElement && window.bootstrap && window.bootstrap.Modal
@@ -53,6 +58,25 @@ document.addEventListener("DOMContentLoaded", function () {
     await processarLogin(email, senha);
   });
 
+  if (cadastroGrupoInput) {
+    cadastroGrupoInput.addEventListener("input", function () {
+      const termo = normalizarGrupoDigitado(cadastroGrupoInput.value);
+      cadastroGrupoInput.value = termo;
+      buscarSugestoesGrupo(termo);
+    });
+
+    cadastroGrupoInput.addEventListener("blur", function () {
+      setTimeout(esconderSugestoesGrupo, 150);
+    });
+
+    cadastroGrupoInput.addEventListener("focus", function () {
+      const termo = normalizarGrupoDigitado(cadastroGrupoInput.value);
+      if (termo.length >= 2) {
+        buscarSugestoesGrupo(termo);
+      }
+    });
+  }
+
   if (cadastroForm) {
     cadastroForm.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -62,6 +86,8 @@ document.addEventListener("DOMContentLoaded", function () {
       const sobrenome = cadastroSobrenomeInput.value.trim();
       const email = cadastroEmailInput.value.trim();
       const senha = cadastroSenhaInput.value;
+      const grupoNome = normalizarGrupoDigitado(cadastroGrupoInput.value);
+      cadastroGrupoInput.value = grupoNome;
 
       if (!nome) {
         exibirMensagemCadastro("Preencha o nome.", "danger");
@@ -99,12 +125,19 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      await processarCadastro({
-        nome,
-        sobrenome,
-        email,
-        senha
-      });
+      if (!grupoNome) {
+        exibirMensagemCadastro("Informe o grupo.", "danger");
+        cadastroGrupoInput.focus();
+        return;
+      }
+
+      if (/\s/.test(grupoNome)) {
+        exibirMensagemCadastro("O nome do grupo deve conter apenas 1 palavra.", "danger");
+        cadastroGrupoInput.focus();
+        return;
+      }
+
+      await processarCadastro({ nome, sobrenome, email, senha, grupoNome });
     });
   }
 
@@ -113,6 +146,7 @@ document.addEventListener("DOMContentLoaded", function () {
       cadastroForm.reset();
       limparMensagemCadastro();
       definirEstadoCadastro(false);
+      esconderSugestoesGrupo();
     });
   }
 
@@ -121,16 +155,20 @@ document.addEventListener("DOMContentLoaded", function () {
       const resposta = await fetch("/sessao", {
         method: "GET",
         credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" }
       });
 
       if (!resposta.ok) {
         return;
       }
 
-      window.location.replace("homepage.html");
+      const dados = await lerJsonSeguro(resposta);
+      if (!dados || !dados.usuario) {
+        return;
+      }
+
+      const destino = dados.usuario.statusGrupo === "aceito" ? "homepage.html" : "aguardando.html";
+      window.location.replace(destino);
     } catch (error) {
       console.error("Erro ao verificar sessão atual:", error);
     }
@@ -138,38 +176,39 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function processarLogin(email, senha) {
     try {
-      definirEstadoCarregando(true);
+      definirEstadoLogin(true);
 
       const resposta = await fetch("/login", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
+          Accept: "application/json"
         },
-        credentials: "include",
-        body: JSON.stringify({
-          email,
-          senha,
-        }),
+        body: JSON.stringify({ email, senha })
       });
 
       const dados = await lerJsonSeguro(resposta);
 
       if (!resposta.ok) {
-        exibirMensagemLogin(
-          dados.erro || "Não foi possível fazer login.",
-          "danger"
-        );
+        exibirMensagemLogin(dados.erro || "Não foi possível entrar.", "danger");
         return;
       }
 
       exibirMensagemLogin("Login realizado com sucesso. Redirecionando...", "success");
-      window.location.replace("homepage.html");
+
+      const destino = dados.usuario && dados.usuario.statusGrupo === "aceito"
+        ? "homepage.html"
+        : "aguardando.html";
+
+      setTimeout(function () {
+        window.location.replace(destino);
+      }, 300);
     } catch (error) {
       console.error("Erro ao processar login:", error);
-      exibirMensagemLogin("Erro de conexão com o servidor.", "danger");
+      exibirMensagemLogin("Erro de conexão ao entrar.", "danger");
     } finally {
-      definirEstadoCarregando(false);
+      definirEstadoLogin(false);
     }
   }
 
@@ -179,101 +218,172 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const resposta = await fetch("/cadastro", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
+          Accept: "application/json"
         },
-        credentials: "include",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
       const dados = await lerJsonSeguro(resposta);
 
       if (!resposta.ok) {
-        exibirMensagemCadastro(
-          dados.erro || "Não foi possível realizar o cadastro.",
-          "danger"
-        );
+        exibirMensagemCadastro(dados.erro || "Não foi possível criar a conta.", "danger");
         return;
       }
 
-      exibirMensagemCadastro("Cadastro realizado com sucesso. Redirecionando...", "success");
+      const statusGrupo = dados.usuario && dados.usuario.statusGrupo ? dados.usuario.statusGrupo : "pendente";
+      const mensagem = statusGrupo === "aceito"
+        ? "Conta criada com sucesso. Redirecionando..."
+        : "Conta criada. Agora aguarde a aprovação do administrador do grupo.";
+
+      exibirMensagemCadastro(mensagem, "success");
 
       setTimeout(function () {
         if (cadastroModal) {
           cadastroModal.hide();
         }
-        window.location.replace("homepage.html");
+        window.location.replace(statusGrupo === "aceito" ? "homepage.html" : "aguardando.html");
       }, 500);
     } catch (error) {
       console.error("Erro ao processar cadastro:", error);
-      exibirMensagemCadastro("Erro de conexão com o servidor.", "danger");
+      exibirMensagemCadastro("Erro de conexão ao criar a conta.", "danger");
     } finally {
       definirEstadoCadastro(false);
     }
   }
 
-  async function lerJsonSeguro(resposta) {
+  async function buscarSugestoesGrupo(termo) {
+    const termoLimpo = String(termo || "").trim();
+
+    if (termoLimpo.length < 2) {
+      esconderSugestoesGrupo();
+      return;
+    }
+
+    ultimoTermoBuscado = termoLimpo;
+
+    if (controladorSugestoes) {
+      controladorSugestoes.abort();
+    }
+
+    controladorSugestoes = new AbortController();
+
     try {
-      return await resposta.json();
-    } catch {
-      return {};
+      const resposta = await fetch(`/grupos/sugestoes?termo=${encodeURIComponent(termoLimpo)}`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal: controladorSugestoes.signal
+      });
+
+      if (!resposta.ok) {
+        esconderSugestoesGrupo();
+        return;
+      }
+
+      const dados = await lerJsonSeguro(resposta);
+      if (termoLimpo !== ultimoTermoBuscado) {
+        return;
+      }
+
+      renderizarSugestoesGrupo(Array.isArray(dados) ? dados : []);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Erro ao buscar sugestões de grupo:", error);
+      }
     }
   }
 
-  function validarEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  function renderizarSugestoesGrupo(lista) {
+    if (!cadastroSugestoesGrupo) {
+      return;
+    }
+
+    cadastroSugestoesGrupo.innerHTML = "";
+
+    if (!Array.isArray(lista) || lista.length === 0) {
+      esconderSugestoesGrupo();
+      return;
+    }
+
+    lista.forEach(function (grupo) {
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "list-group-item list-group-item-action";
+      botao.textContent = grupo.nome + (grupo.codigo ? ` (${grupo.codigo})` : "");
+      botao.addEventListener("click", function () {
+        cadastroGrupoInput.value = String(grupo.nome || "").trim();
+        esconderSugestoesGrupo();
+        cadastroGrupoInput.focus();
+      });
+      cadastroSugestoesGrupo.appendChild(botao);
+    });
+
+    cadastroSugestoesGrupo.hidden = false;
   }
 
-  function exibirMensagemLogin(mensagem, tipo = "danger") {
-    loginMessage.textContent = mensagem;
-    loginMessage.className = `mb-3 small text-${tipo}`;
-    loginMessage.setAttribute("role", tipo === "danger" ? "alert" : "status");
+  function esconderSugestoesGrupo() {
+    if (!cadastroSugestoesGrupo) {
+      return;
+    }
+    cadastroSugestoesGrupo.hidden = true;
+    cadastroSugestoesGrupo.innerHTML = "";
+  }
+
+  function normalizarGrupoDigitado(valor) {
+    return String(valor || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .split(" ")[0] || "";
+  }
+
+  function definirEstadoLogin(ativo) {
+    btnEntrar.disabled = Boolean(ativo);
+    btnEntrar.textContent = ativo ? "Entrando..." : "Entrar";
+  }
+
+  function definirEstadoCadastro(ativo) {
+    if (btnCadastrar) {
+      btnCadastrar.disabled = Boolean(ativo);
+      btnCadastrar.textContent = ativo ? "Cadastrando..." : "Cadastrar";
+    }
+  }
+
+  function exibirMensagemLogin(texto, variante) {
+    loginMessage.className = `mb-3 small text-${variante}`;
+    loginMessage.textContent = texto;
   }
 
   function limparMensagemLogin() {
-    loginMessage.textContent = "";
     loginMessage.className = "mb-3 small";
-    loginMessage.setAttribute("role", "status");
+    loginMessage.textContent = "";
   }
 
-  function exibirMensagemCadastro(mensagem, tipo = "danger") {
-    if (!cadastroMessage) {
-      return;
-    }
-
-    cadastroMessage.textContent = mensagem;
-    cadastroMessage.className = `small text-${tipo}`;
-    cadastroMessage.setAttribute("role", tipo === "danger" ? "alert" : "status");
+  function exibirMensagemCadastro(texto, variante) {
+    cadastroMessage.className = `small text-${variante}`;
+    cadastroMessage.textContent = texto;
   }
 
   function limparMensagemCadastro() {
-    if (!cadastroMessage) {
-      return;
-    }
-
-    cadastroMessage.textContent = "";
     cadastroMessage.className = "small";
-    cadastroMessage.setAttribute("role", "status");
+    cadastroMessage.textContent = "";
   }
 
-  function definirEstadoCarregando(carregando) {
-    btnEntrar.disabled = carregando;
-    emailInput.disabled = carregando;
-    senhaInput.disabled = carregando;
-    btnEntrar.textContent = carregando ? "Entrando..." : "Entrar";
+  function validarEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ""));
   }
 
-  function definirEstadoCadastro(carregando) {
-    if (!cadastroForm || !btnCadastrar) {
-      return;
+  async function lerJsonSeguro(resposta) {
+    const texto = await resposta.text();
+    if (!texto) {
+      return {};
     }
-
-    cadastroNomeInput.disabled = carregando;
-    cadastroSobrenomeInput.disabled = carregando;
-    cadastroEmailInput.disabled = carregando;
-    cadastroSenhaInput.disabled = carregando;
-    btnCadastrar.disabled = carregando;
-    btnCadastrar.textContent = carregando ? "Cadastrando..." : "Cadastrar";
+    try {
+      return JSON.parse(texto);
+    } catch (error) {
+      return {};
+    }
   }
 });
