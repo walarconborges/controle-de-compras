@@ -4,11 +4,12 @@
  */
 const validateSchema = require("../middlewares/validateSchema");
 const { grupoIdParamSchema, grupoBodySchema } = require("../validators/grupoSchemas");
+const { anexarContextoErro } = require("../utils/errorUtils");
 
 module.exports = function registerGrupoRoutes(app, deps) {
   const { prisma, exigirAutenticacao, exigirPapel, obterGrupoIdSessao, idsSaoIguais, normalizarNomeGrupo, gerarCodigoGrupo } = deps;
 
-  app.get("/grupos", exigirAutenticacao, async (req, res) => {
+  app.get("/grupos", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -19,12 +20,11 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
       res.json(grupos);
     } catch (error) {
-      console.error("Erro ao buscar grupos:", error);
-      res.status(500).json({ erro: "Erro ao buscar grupos" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar grupos" }));
     }
   });
 
-  app.get("/grupos/:id", exigirAutenticacao, validateSchema({ params: grupoIdParamSchema }), async (req, res) => {
+  app.get("/grupos/:id", exigirAutenticacao, validateSchema({ params: grupoIdParamSchema }), async (req, res, next) => {
     try {
       const { id } = req.params;
       const grupoIdSessao = obterGrupoIdSessao(req);
@@ -43,12 +43,11 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
       res.json(grupo);
     } catch (error) {
-      console.error("Erro ao buscar grupo:", error);
-      res.status(500).json({ erro: "Erro ao buscar grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar grupo" }));
     }
   });
 
-  app.post("/grupos", exigirAutenticacao, exigirPapel("admin"), validateSchema({ body: grupoBodySchema }), async (req, res) => {
+  app.post("/grupos", exigirAutenticacao, exigirPapel("admin"), validateSchema({ body: grupoBodySchema }), async (req, res, next) => {
     try {
       const nome = normalizarNomeGrupo(req.body.nome);
 
@@ -63,13 +62,13 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
       res.status(201).json(grupo);
     } catch (error) {
-      console.error("Erro ao criar grupo:", error);
+      
 
       if (error.code === "P2002") {
         return res.status(409).json({ erro: "Esse grupo já existe" });
       }
 
-      res.status(500).json({ erro: "Erro ao criar grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao criar grupo" }));
     }
   });
 
@@ -78,7 +77,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoIdSessao = obterGrupoIdSessao(req);
@@ -94,7 +93,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
         res.json(grupo);
       } catch (error) {
-        console.error("Erro ao atualizar grupo:", error);
+        
 
         if (error.code === "P2025") {
           return res.status(404).json({ erro: "Grupo não encontrado" });
@@ -104,7 +103,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
           return res.status(409).json({ erro: "Esse grupo já existe" });
         }
 
-        res.status(500).json({ erro: "Erro ao atualizar grupo" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar grupo" }));
       }
     }
   );
@@ -114,7 +113,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: grupoIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoIdSessao = obterGrupoIdSessao(req);
@@ -129,13 +128,13 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
         res.json({ mensagem: "Grupo excluído com sucesso" });
       } catch (error) {
-        console.error("Erro ao excluir grupo:", error);
+        
 
         if (error.code === "P2025") {
           return res.status(404).json({ erro: "Grupo não encontrado" });
         }
 
-        res.status(500).json({ erro: "Erro ao excluir grupo" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir grupo" }));
       }
     }
   );

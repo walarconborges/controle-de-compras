@@ -4,6 +4,7 @@
  */
 const { Prisma } = require("@prisma/client");
 const validateSchema = require("../middlewares/validateSchema");
+const { anexarContextoErro } = require("../utils/errorUtils");
 const {
   grupoItemIdParamSchema,
   grupoItemCreateBodySchema,
@@ -21,7 +22,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     normalizarUnidade,
   } = deps;
 
-  app.get("/grupo-itens", exigirAutenticacao, async (req, res) => {
+  app.get("/grupo-itens", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -55,12 +56,11 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
       res.json(grupoItens);
     } catch (error) {
-      console.error("Erro ao buscar itens do grupo:", error);
-      res.status(500).json({ erro: "Erro ao buscar itens do grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar itens do grupo" }));
     }
   });
 
-  app.get("/grupo-itens/comprar", exigirAutenticacao, async (req, res) => {
+  app.get("/grupo-itens/comprar", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -95,12 +95,11 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
       res.json(grupoItens);
     } catch (error) {
-      console.error("Erro ao buscar itens marcados para comprar:", error);
-      res.status(500).json({ erro: "Erro ao buscar itens marcados para comprar" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar itens marcados para comprar" }));
     }
   });
 
-  app.get("/grupo-itens/:id", exigirAutenticacao, validateSchema({ params: grupoItemIdParamSchema }), async (req, res) => {
+  app.get("/grupo-itens/:id", exigirAutenticacao, validateSchema({ params: grupoItemIdParamSchema }), async (req, res, next) => {
     try {
       const { id } = req.params;
       const grupoId = obterGrupoIdSessao(req);
@@ -126,12 +125,11 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
       res.json(grupoItem);
     } catch (error) {
-      console.error("Erro ao buscar item do grupo:", error);
-      res.status(500).json({ erro: "Erro ao buscar item do grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar item do grupo" }));
     }
   });
 
-  app.post("/grupo-itens", exigirAutenticacao, validateSchema({ body: grupoItemCreateBodySchema }), async (req, res) => {
+  app.post("/grupo-itens", exigirAutenticacao, validateSchema({ body: grupoItemCreateBodySchema }), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -198,13 +196,13 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
       res.status(201).json(grupoItem);
     } catch (error) {
-      console.error("Erro ao criar item do grupo:", error);
+      
 
       if (error.code === "P2002") {
         return res.status(409).json({ erro: "Esse item já está vinculado ao grupo" });
       }
 
-      res.status(500).json({ erro: "Erro ao criar item do grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao criar item do grupo" }));
     }
   });
 
@@ -212,7 +210,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     "/grupo-itens/:id",
     exigirAutenticacao,
     validateSchema({ params: grupoItemIdParamSchema, body: grupoItemUpdateBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -253,8 +251,8 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json(grupoItem);
       } catch (error) {
-        console.error("Erro ao atualizar item do grupo:", error);
-        res.status(500).json({ erro: "Erro ao atualizar item do grupo" });
+        
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar item do grupo" }));
       }
     }
   );
@@ -263,7 +261,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     "/grupo-itens/:id/comprar",
     exigirAutenticacao,
     validateSchema({ params: grupoItemIdParamSchema, body: grupoItemPatchComprarBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -296,8 +294,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json(grupoItem);
       } catch (error) {
-        console.error("Erro ao atualizar flag comprar:", error);
-        res.status(500).json({ erro: "Erro ao atualizar flag comprar" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar flag comprar" }));
       }
     }
   );
@@ -306,7 +303,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     "/grupo-itens/:id/quantidade",
     exigirAutenticacao,
     validateSchema({ params: grupoItemIdParamSchema, body: grupoItemPatchQuantidadeBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -339,8 +336,8 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json(grupoItem);
       } catch (error) {
-        console.error("Erro ao atualizar quantidade do item do grupo:", error);
-        res.status(500).json({ erro: "Erro ao atualizar quantidade do item do grupo" });
+        
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar quantidade do item do grupo" }));
       }
     }
   );
@@ -349,7 +346,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     "/grupo-itens/:id",
     exigirAutenticacao,
     validateSchema({ params: grupoItemIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -371,8 +368,8 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json({ mensagem: "Item removido do grupo com sucesso" });
       } catch (error) {
-        console.error("Erro ao excluir item do grupo:", error);
-        res.status(500).json({ erro: "Erro ao excluir item do grupo" });
+        
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir item do grupo" }));
       }
     }
   );

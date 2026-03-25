@@ -3,6 +3,7 @@
  * Ele existe para concentrar listagem, leitura, criação, atualização e exclusão de usuários.
  */
 const validateSchema = require("../middlewares/validateSchema");
+const { anexarContextoErro } = require("../utils/errorUtils");
 const {
   usuarioIdParamSchema,
   usuarioCreateBodySchema,
@@ -21,7 +22,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
     bcrypt,
   } = deps;
 
-  app.get("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
+  app.get("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -53,12 +54,11 @@ module.exports = function registerUsuarioRoutes(app, deps) {
           .map((vinculo) => normalizarUsuarioResposta(vinculo.usuario))
       );
     } catch (error) {
-      console.error("Erro ao buscar usuários:", error);
-      res.status(500).json({ erro: "Erro ao buscar usuários" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar usuários" }));
     }
   });
 
-  app.get("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), validateSchema({ params: usuarioIdParamSchema }), async (req, res) => {
+  app.get("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), validateSchema({ params: usuarioIdParamSchema }), async (req, res, next) => {
     try {
       const { id } = req.params;
       const grupoId = obterGrupoIdSessao(req);
@@ -89,12 +89,11 @@ module.exports = function registerUsuarioRoutes(app, deps) {
 
       res.json(normalizarUsuarioResposta(vinculo.usuario));
     } catch (error) {
-      console.error("Erro ao buscar usuário:", error);
-      res.status(500).json({ erro: "Erro ao buscar usuário" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar usuário" }));
     }
   });
 
-  app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), validateSchema({ body: usuarioCreateBodySchema }), async (req, res) => {
+  app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), validateSchema({ body: usuarioCreateBodySchema }), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
       const nome = normalizarTextoSimples(req.body.nome);
@@ -134,13 +133,13 @@ module.exports = function registerUsuarioRoutes(app, deps) {
 
       res.status(201).json(normalizarUsuarioResposta(usuario));
     } catch (error) {
-      console.error("Erro ao criar usuário:", error);
+      
 
       if (error.code === "P2002") {
         return res.status(409).json({ erro: "Nome ou email já cadastrado" });
       }
 
-      res.status(500).json({ erro: "Erro ao criar usuário" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao criar usuário" }));
     }
   });
 
@@ -149,7 +148,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: usuarioIdParamSchema, body: usuarioUpdateBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -197,7 +196,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
 
         res.json(normalizarUsuarioResposta(usuario));
       } catch (error) {
-        console.error("Erro ao atualizar usuário:", error);
+        
 
         if (error.code === "P2025") {
           return res.status(404).json({ erro: "Usuário não encontrado" });
@@ -207,7 +206,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
           return res.status(409).json({ erro: "Nome ou email já cadastrado" });
         }
 
-        res.status(500).json({ erro: "Erro ao atualizar usuário" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar usuário" }));
       }
     }
   );
@@ -217,7 +216,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: usuarioIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -239,13 +238,13 @@ module.exports = function registerUsuarioRoutes(app, deps) {
 
         res.json({ mensagem: "Usuário excluído com sucesso" });
       } catch (error) {
-        console.error("Erro ao excluir usuário:", error);
+        
 
         if (error.code === "P2025") {
           return res.status(404).json({ erro: "Usuário não encontrado" });
         }
 
-        res.status(500).json({ erro: "Erro ao excluir usuário" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir usuário" }));
       }
     }
   );

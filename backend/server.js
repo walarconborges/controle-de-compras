@@ -39,6 +39,7 @@ const registerUsuarioGrupoRoutes = require("./routes/usuarioGrupoRoutes");
 const registerGrupoItemRoutes = require("./routes/grupoItemRoutes");
 const registerCompraRoutes = require("./routes/compraRoutes");
 const registerSystemRoutes = require("./routes/systemRoutes");
+const { notFoundHandler, errorHandler } = require("./middlewares/errorMiddleware");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -153,6 +154,9 @@ registerUsuarioGrupoRoutes(app, deps);
 registerGrupoItemRoutes(app, deps);
 registerCompraRoutes(app, deps);
 registerSystemRoutes(app, deps);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 const PORTA = Number(process.env.PORT) || 3001;
 const HOST = "0.0.0.0";

@@ -5,6 +5,7 @@
 const { Prisma } = require("@prisma/client");
 const validateSchema = require("../middlewares/validateSchema");
 const { compraBodySchema } = require("../validators/compraSchemas");
+const { anexarContextoErro } = require("../utils/errorUtils");
 
 module.exports = function registerCompraRoutes(app, deps) {
   const {
@@ -17,7 +18,7 @@ module.exports = function registerCompraRoutes(app, deps) {
     normalizarCompraResposta,
   } = deps;
 
-  app.get("/compras", exigirAutenticacao, async (req, res) => {
+  app.get("/compras", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -51,12 +52,11 @@ module.exports = function registerCompraRoutes(app, deps) {
 
       res.json(compras.map(normalizarCompraResposta));
     } catch (error) {
-      console.error("Erro ao buscar compras:", error);
-      res.status(500).json({ erro: "Erro ao buscar compras" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar compras" }));
     }
   });
 
-  app.post("/compras", exigirAutenticacao, validateSchema({ body: compraBodySchema }), async (req, res) => {
+  app.post("/compras", exigirAutenticacao, validateSchema({ body: compraBodySchema }), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
       const usuarioId = req.session.usuario?.id;
@@ -176,12 +176,11 @@ module.exports = function registerCompraRoutes(app, deps) {
 
       res.status(201).json(resultado);
     } catch (error) {
-      console.error("Erro ao finalizar compra:", error);
-      res.status(500).json({ erro: "Erro ao finalizar compra" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao finalizar compra" }));
     }
   });
 
-  app.get("/movimentacoes-estoque", exigirAutenticacao, async (req, res) => {
+  app.get("/movimentacoes-estoque", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -217,8 +216,7 @@ module.exports = function registerCompraRoutes(app, deps) {
 
       res.json(movimentacoesNormalizadas);
     } catch (error) {
-      console.error("Erro ao buscar movimentações de estoque:", error);
-      res.status(500).json({ erro: "Erro ao buscar movimentações de estoque" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar movimentações de estoque" }));
     }
   });
 

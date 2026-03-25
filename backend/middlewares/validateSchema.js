@@ -3,6 +3,7 @@
  * Ele existe para centralizar validação de entrada e devolver erros previsíveis antes da regra de negócio.
  */
 const { ZodError } = require("zod");
+const { AppError } = require("../utils/errorUtils");
 
 function extrairMensagemDeErro(error) {
   if (!(error instanceof ZodError) || !Array.isArray(error.issues) || error.issues.length === 0) {
@@ -30,13 +31,14 @@ function validateSchema(schemas = {}) {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        return res.status(400).json({
-          erro: extrairMensagemDeErro(error),
-          detalhes: error.issues.map((issue) => ({
-            caminho: Array.isArray(issue.path) ? issue.path.join(".") : "",
-            mensagem: issue.message,
-          })),
-        });
+        return next(
+          new AppError(400, extrairMensagemDeErro(error), {
+            details: error.issues.map((issue) => ({
+              caminho: Array.isArray(issue.path) ? issue.path.join(".") : "",
+              mensagem: issue.message,
+            })),
+          })
+        );
       }
 
       next(error);

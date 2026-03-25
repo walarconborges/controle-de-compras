@@ -3,6 +3,7 @@
  * Ele existe para concentrar gerenciamento administrativo dessa relação.
  */
 const validateSchema = require("../middlewares/validateSchema");
+const { anexarContextoErro } = require("../utils/errorUtils");
 const {
   usuarioGrupoIdParamSchema,
   usuarioGrupoBodySchema,
@@ -11,7 +12,7 @@ const {
 module.exports = function registerUsuarioGrupoRoutes(app, deps) {
   const { prisma, exigirAutenticacao, exigirPapel, obterGrupoIdSessao, idsSaoIguais } = deps;
 
-  app.get("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
+  app.get("/usuarios-grupos", exigirAutenticacao, exigirPapel("admin"), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -38,8 +39,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
 
       res.json(vinculos);
     } catch (error) {
-      console.error("Erro ao buscar vínculos:", error);
-      res.status(500).json({ erro: "Erro ao buscar vínculos" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar vínculos" }));
     }
   });
 
@@ -48,7 +48,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: usuarioGrupoIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -78,8 +78,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
 
         res.json(vinculo);
       } catch (error) {
-        console.error("Erro ao buscar vínculo:", error);
-        res.status(500).json({ erro: "Erro ao buscar vínculo" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar vínculo" }));
       }
     }
   );
@@ -89,7 +88,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ body: usuarioGrupoBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { usuarioId, grupoId, papel } = req.body;
         const grupoIdSessao = obterGrupoIdSessao(req);
@@ -122,13 +121,13 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
 
         res.status(201).json(vinculo);
       } catch (error) {
-        console.error("Erro ao criar vínculo:", error);
+        
 
         if (error.code === "P2002") {
           return res.status(409).json({ erro: "Esse vínculo já existe" });
         }
 
-        res.status(500).json({ erro: "Erro ao criar vínculo" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao criar vínculo" }));
       }
     }
   );
@@ -138,7 +137,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: usuarioGrupoIdParamSchema, body: usuarioGrupoBodySchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const { usuarioId, grupoId, papel } = req.body;
@@ -182,7 +181,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
 
         res.json(vinculo);
       } catch (error) {
-        console.error("Erro ao atualizar vínculo:", error);
+        
 
         if (error.code === "P2025") {
           return res.status(404).json({ erro: "Vínculo não encontrado" });
@@ -192,7 +191,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
           return res.status(409).json({ erro: "Esse vínculo já existe" });
         }
 
-        res.status(500).json({ erro: "Erro ao atualizar vínculo" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar vínculo" }));
       }
     }
   );
@@ -202,7 +201,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: usuarioGrupoIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -224,13 +223,13 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
 
         res.json({ mensagem: "Vínculo excluído com sucesso" });
       } catch (error) {
-        console.error("Erro ao excluir vínculo:", error);
+        
 
         if (error.code === "P2025") {
           return res.status(404).json({ erro: "Vínculo não encontrado" });
         }
 
-        res.status(500).json({ erro: "Erro ao excluir vínculo" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir vínculo" }));
       }
     }
   );

@@ -3,6 +3,7 @@
  * Ele existe para concentrar fluxos de entrada do usuário e atualização da sessão autenticada.
  */
 const validateSchema = require("../middlewares/validateSchema");
+const { anexarContextoErro } = require("../utils/errorUtils");
 const {
   sugestoesGrupoQuerySchema,
   cadastroBodySchema,
@@ -26,7 +27,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     obterGrupoIdSessao,
   } = deps;
 
-  app.get("/grupos/sugestoes", validateSchema({ query: sugestoesGrupoQuerySchema }), async (req, res) => {
+  app.get("/grupos/sugestoes", validateSchema({ query: sugestoesGrupoQuerySchema }), async (req, res, next) => {
     try {
       const termo = normalizarNomeGrupo(req.query.termo);
 
@@ -54,12 +55,11 @@ module.exports = function registerAuthRoutes(app, deps) {
 
       res.json(grupos);
     } catch (error) {
-      console.error("Erro ao buscar sugestões de grupos:", error);
-      res.status(500).json({ erro: "Erro ao buscar sugestões de grupos" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar sugestões de grupos" }));
     }
   });
 
-  app.post("/cadastro", validateSchema({ body: cadastroBodySchema }), async (req, res) => {
+  app.post("/cadastro", validateSchema({ body: cadastroBodySchema }), async (req, res, next) => {
     try {
       const nome = normalizarTextoSimples(req.body.nome);
       const sobrenome = normalizarTextoSimples(req.body.sobrenome);
@@ -148,17 +148,17 @@ module.exports = function registerAuthRoutes(app, deps) {
         usuario: sessaoUsuario,
       });
     } catch (error) {
-      console.error("Erro ao realizar cadastro:", error);
+      
 
       if (error.code === "P2002") {
         return res.status(409).json({ erro: "Já existe um usuário com esse nome ou email" });
       }
 
-      res.status(500).json({ erro: "Erro ao realizar cadastro" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao realizar cadastro" }));
     }
   });
 
-  app.post("/login", validateSchema({ body: loginBodySchema }), async (req, res) => {
+  app.post("/login", validateSchema({ body: loginBodySchema }), async (req, res, next) => {
     try {
       const email = normalizarEmail(req.body.email);
       const senha = normalizarTextoSimples(req.body.senha);
@@ -200,22 +200,20 @@ module.exports = function registerAuthRoutes(app, deps) {
         usuario: sessaoUsuario,
       });
     } catch (error) {
-      console.error("Erro ao fazer login:", error);
-      res.status(500).json({ erro: "Erro ao fazer login" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao fazer login" }));
     }
   });
 
-  app.get("/sessao", exigirAutenticacao, async (req, res) => {
+  app.get("/sessao", exigirAutenticacao, async (req, res, next) => {
     try {
       const sessaoAtualizada = await atualizarSessaoUsuario(req, req.session.usuario.id);
       res.json({ usuario: sessaoAtualizada });
     } catch (error) {
-      console.error("Erro ao carregar sessão:", error);
-      res.status(500).json({ erro: "Erro ao carregar sessão" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao carregar sessão" }));
     }
   });
 
-  app.get("/meu-status-grupo", exigirAutenticacao, async (req, res) => {
+  app.get("/meu-status-grupo", exigirAutenticacao, async (req, res, next) => {
     try {
       const sessaoAtualizada = await atualizarSessaoUsuario(req, req.session.usuario.id);
       res.json({
@@ -226,12 +224,11 @@ module.exports = function registerAuthRoutes(app, deps) {
         grupoCodigo: sessaoAtualizada?.grupoCodigo || null,
       });
     } catch (error) {
-      console.error("Erro ao carregar status do grupo:", error);
-      res.status(500).json({ erro: "Erro ao carregar status do grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao carregar status do grupo" }));
     }
   });
 
-  app.get("/meu-perfil", exigirAutenticacao, async (req, res) => {
+  app.get("/meu-perfil", exigirAutenticacao, async (req, res, next) => {
     try {
       const sessaoAtualizada = await atualizarSessaoUsuario(req, req.session.usuario.id);
       const vinculo = await prisma.usuarioGrupo.findFirst({
@@ -260,12 +257,11 @@ module.exports = function registerAuthRoutes(app, deps) {
         aprovadoEm: vinculo?.aprovadoEm || null,
       });
     } catch (error) {
-      console.error("Erro ao carregar perfil:", error);
-      res.status(500).json({ erro: "Erro ao carregar perfil" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao carregar perfil" }));
     }
   });
 
-  app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res) => {
+  app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -287,12 +283,11 @@ module.exports = function registerAuthRoutes(app, deps) {
 
       res.json(vinculos.map((vinculo) => ({ ...vinculo, usuario: normalizarUsuarioResposta(vinculo.usuario) })));
     } catch (error) {
-      console.error("Erro ao carregar membros do grupo:", error);
-      res.status(500).json({ erro: "Erro ao carregar membros do grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao carregar membros do grupo" }));
     }
   });
 
-  app.get("/meu-grupo/solicitacoes", exigirAutenticacao, exigirPapel("admin"), async (req, res) => {
+  app.get("/meu-grupo/solicitacoes", exigirAutenticacao, exigirPapel("admin"), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
@@ -322,8 +317,7 @@ module.exports = function registerAuthRoutes(app, deps) {
         }))
       );
     } catch (error) {
-      console.error("Erro ao carregar solicitações do grupo:", error);
-      res.status(500).json({ erro: "Erro ao carregar solicitações do grupo" });
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao carregar solicitações do grupo" }));
     }
   });
 
@@ -332,7 +326,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: solicitacaoIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -363,8 +357,7 @@ module.exports = function registerAuthRoutes(app, deps) {
 
         res.json({ ...atualizado, usuario: normalizarUsuarioResposta(atualizado.usuario) });
       } catch (error) {
-        console.error("Erro ao aceitar solicitação:", error);
-        res.status(500).json({ erro: "Erro ao aceitar solicitação" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao aceitar solicitação" }));
       }
     }
   );
@@ -374,7 +367,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel("admin"),
     validateSchema({ params: solicitacaoIdParamSchema }),
-    async (req, res) => {
+    async (req, res, next) => {
       try {
         const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
@@ -404,17 +397,15 @@ module.exports = function registerAuthRoutes(app, deps) {
 
         res.json({ ...atualizado, usuario: normalizarUsuarioResposta(atualizado.usuario) });
       } catch (error) {
-        console.error("Erro ao recusar solicitação:", error);
-        res.status(500).json({ erro: "Erro ao recusar solicitação" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao recusar solicitação" }));
       }
     }
   );
 
-  app.post("/logout", (req, res) => {
+  app.post("/logout", (req, res, next) => {
     req.session.destroy((error) => {
       if (error) {
-        console.error("Erro ao fazer logout:", error);
-        return res.status(500).json({ erro: "Erro ao fazer logout" });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao fazer logout" }));
       }
 
       res.clearCookie("connect.sid");

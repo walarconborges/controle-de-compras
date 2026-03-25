@@ -2,9 +2,11 @@
  * Este arquivo guarda middlewares de autenticação e autorização.
  * Ele existe para centralizar as barreiras de acesso reutilizadas pelas rotas.
  */
+const { AppError } = require("../utils/errorUtils");
+
 function exigirAutenticacao(req, res, next) {
   if (!req.session.usuario) {
-    return res.status(401).json({ erro: "Usuário não autenticado" });
+    return next(new AppError(401, "Usuário não autenticado"));
   }
 
   next();
@@ -13,11 +15,11 @@ function exigirAutenticacao(req, res, next) {
 function exigirPapel(...papeisPermitidos) {
   return (req, res, next) => {
     if (!req.session.usuario) {
-      return res.status(401).json({ erro: "Usuário não autenticado" });
+      return next(new AppError(401, "Usuário não autenticado"));
     }
 
     if (!papeisPermitidos.includes(req.session.usuario.papel)) {
-      return res.status(403).json({ erro: "Acesso negado" });
+      return next(new AppError(403, "Acesso negado"));
     }
 
     next();
