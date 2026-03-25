@@ -1959,7 +1959,3 @@ const HOST = "0.0.0.0";
 app.listen(PORTA, HOST, () => {
   console.log(`Servidor rodando em ${HOST}:${PORTA}`);
 });
-
-app.listen(PORTA, HOST, () => {
-  console.log(`Servidor rodando em ${HOST}:${PORTA}`);
-});
