@@ -11,8 +11,7 @@
   <div class="container py-4">
     <header class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
       <div>
-        <h1 class="h3 mb-1">Perfil</h1>
-        
+        <h1 class="h3 mb-0">Perfil</h1>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <a href="homepage.html" class="btn btn-outline-secondary">Início</a>
@@ -21,25 +20,26 @@
       </div>
     </header>
 
+    <div id="perfil-message" aria-live="polite" class="mb-3"></div>
+
     <section class="card mb-4">
       <div class="card-body">
-        <h2 class="h5 mb-3">Dados da conta</h2>
         <div id="perfil-dados" class="small text-muted mb-3">Carregando...</div>
 
         <form id="perfil-form" class="row g-3">
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label" for="perfil-nome">Nome</label>
             <input class="form-control" id="perfil-nome" type="text">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label" for="perfil-sobrenome">Sobrenome</label>
             <input class="form-control" id="perfil-sobrenome" type="text">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label" for="perfil-email">E-mail</label>
             <input class="form-control" id="perfil-email" type="email">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label" for="perfil-senha">Nova senha</label>
             <input class="form-control" id="perfil-senha" type="password" placeholder="Opcional">
           </div>
@@ -50,12 +50,9 @@
       </div>
     </section>
 
-    <section class="card mb-4">
+    <section class="card mb-4" id="secao-vinculos" hidden>
       <div class="card-body">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
-          <h2 class="h5 mb-0">Vínculos com grupos</h2>
-          
-        </div>
+        <h2 class="h5 mb-3">Vínculos com grupos</h2>
         <div class="table-responsive">
           <table class="table align-middle mb-0">
             <thead>
@@ -76,8 +73,7 @@
     <section class="card mb-4">
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
-          <h2 class="h5 mb-0">Membros do grupo ativo</h2>
-          <span class="small text-muted" id="perfil-admin-aviso"></span>
+          <h2 class="h5 mb-0">Membros do grupo</h2>
         </div>
 
         <form id="convite-form" class="row g-3 mb-3" hidden>
@@ -96,18 +92,18 @@
         </form>
 
         <div class="d-flex gap-2 mb-3">
-          <button class="btn btn-outline-warning" id="btn-sair-grupo" type="button">Sair do grupo ativo</button>
+          <button class="btn btn-outline-warning" id="btn-sair-grupo" type="button">Sair do grupo</button>
         </div>
 
         <div class="table-responsive">
           <table class="table align-middle mb-0">
             <thead>
-              <tr>
+              <tr id="perfil-membros-head">
                 <th>Nome</th>
                 <th>E-mail</th>
                 <th>Papel</th>
                 <th>Status</th>
-                <th class="text-end">Ações</th>
+                <th class="text-end" id="perfil-membros-th-acoes">Ações</th>
               </tr>
             </thead>
             <tbody id="perfil-membros"></tbody>
@@ -116,11 +112,10 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="secao-pendencias" hidden>
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
-          <h2 class="h5 mb-0">Pendências do grupo ativo</h2>
-          <span class="small text-muted">Solicitações e convites.</span>
+          <h2 class="h5 mb-0">Pendências do grupo</h2>
         </div>
         <div class="table-responsive">
           <table class="table align-middle mb-0">
@@ -136,10 +131,10 @@
             <tbody id="perfil-solicitacoes"></tbody>
           </table>
         </div>
-        <div class="small mt-3" id="perfil-message" aria-live="polite"></div>
       </div>
     </section>
   </div>
+
   <script type="module" src="js/perfil.js"></script>
 </body>
 </html>

@@ -2,18 +2,13 @@ import { apiGet, apiPatch, apiPost } from "./api.js";
 import { ensureAnySession, logoutAndRedirect } from "./auth.js";
 import { clearElement, createTableMessageRow, createTextCell, renderKeyValueRows } from "./dom.js";
 import { getFullName } from "./formatters.js";
-import {
-  setFeedbackMessage,
-  clearFieldErrors,
-  setFieldError
-} from "./messages.js";
+import { setFeedbackMessage, clearFieldErrors, setFieldError } from "./messages.js";
 
 document.addEventListener("DOMContentLoaded", function () {
   const perfilDados = document.getElementById("perfil-dados");
   const perfilMembros = document.getElementById("perfil-membros");
   const perfilSolicitacoes = document.getElementById("perfil-solicitacoes");
   const perfilVinculos = document.getElementById("perfil-vinculos");
-  const perfilAdminAviso = document.getElementById("perfil-admin-aviso");
   const perfilMessage = document.getElementById("perfil-message");
   const btnLogout = document.getElementById("btn-logout");
   const btnSairGrupo = document.getElementById("btn-sair-grupo");
@@ -22,6 +17,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const conviteEmail = document.getElementById("convite-email");
   const convitePapel = document.getElementById("convite-papel");
   const linkPainelSistema = document.getElementById("link-painel-sistema");
+  const secaoVinculos = document.getElementById("secao-vinculos");
+  const secaoPendencias = document.getElementById("secao-pendencias");
+  const membrosThAcoes = document.getElementById("perfil-membros-th-acoes");
 
   const inputNome = document.getElementById("perfil-nome");
   const inputSobrenome = document.getElementById("perfil-sobrenome");
@@ -35,6 +33,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let sessaoAtual = null;
   let papelAtual = "";
+  let adminSistemaAtual = false;
 
   inicializar();
 
@@ -69,19 +68,39 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
+  function isAdminGrupoOuSistema() {
+    return adminSistemaAtual || papelAtual === "admingrupo";
+  }
+
+  function formatarGrupoAtivo(perfil) {
+    const nome = perfil.grupoNome || "";
+    const codigo = perfil.grupoCodigo || "";
+    if (nome && codigo) return `${nome} (${codigo})`;
+    return nome || codigo || "Nenhum selecionado";
+  }
+
+  function deveMostrarVinculos(vinculos) {
+    const vinculosRelevantes = Array.isArray(vinculos) ? vinculos : [];
+    if (vinculosRelevantes.length > 1) return true;
+    return vinculosRelevantes.some(function (vinculo) {
+      return ["pendente", "convidado"].includes(String(vinculo.status || "").toLowerCase());
+    });
+  }
+
   async function inicializar() {
     try {
       exibirMensagem("Carregando perfil...", "muted");
       renderizarLoadingInicial();
       sessaoAtual = await ensureAnySession();
       papelAtual = String(sessaoAtual.papel || "").toLowerCase();
+      adminSistemaAtual = Boolean(sessaoAtual.adminSistema);
 
       if (linkPainelSistema) {
-        linkPainelSistema.hidden = !sessaoAtual.adminSistema;
+        linkPainelSistema.hidden = !adminSistemaAtual;
       }
 
       await carregarTudo();
-      exibirMensagem("Perfil carregado com sucesso.", "success");
+      exibirMensagem("", "muted");
     } catch (error) {
       console.error("Erro ao carregar perfil:", error);
       exibirMensagem("Não foi possível carregar a página de perfil.", "danger");
@@ -102,6 +121,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const perfil = dados.usuario || dados;
     sessaoAtual = perfil;
     papelAtual = String(perfil.papel || "").toLowerCase();
+    adminSistemaAtual = Boolean(perfil.adminSistema);
 
     inputNome.value = perfil.nome || "";
     inputSobrenome.value = perfil.sobrenome || "";
@@ -111,19 +131,24 @@ document.addEventListener("DOMContentLoaded", function () {
     renderKeyValueRows(perfilDados, [
       ["Nome completo", perfil.nomeCompleto || perfil.nome || "-"],
       ["E-mail", perfil.email || "-"],
-      ["Papel global", perfil.papelGlobal || "usuario"],
-      ["Admin do sistema", perfil.adminSistema ? "Sim" : "Não"],
-      ["Grupo ativo", perfil.grupoNome || "Nenhum selecionado"],
-      ["Código do grupo ativo", perfil.grupoCodigo || "-"],
-      ["Papel no grupo ativo", perfil.papel || "-"],
+      ["Grupo ativo", formatarGrupoAtivo(perfil)],
       ["Status atual", perfil.statusGrupo || "-"]
     ]);
 
     if (conviteForm) {
-      conviteForm.hidden = papelAtual !== "admingrupo";
+      conviteForm.hidden = !isAdminGrupoOuSistema();
     }
+
     if (btnSairGrupo) {
       btnSairGrupo.hidden = !perfil.grupoId;
+    }
+
+    if (membrosThAcoes) {
+      membrosThAcoes.hidden = !isAdminGrupoOuSistema();
+    }
+
+    if (secaoPendencias) {
+      secaoPendencias.hidden = !isAdminGrupoOuSistema();
     }
   }
 
@@ -135,7 +160,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const perfil = dados.usuario || dados;
     const vinculos = Array.isArray(perfil.vinculos) ? perfil.vinculos : [];
+    const mostrar = deveMostrarVinculos(vinculos);
+
+    if (secaoVinculos) {
+      secaoVinculos.hidden = !mostrar;
+    }
+
     clearElement(perfilVinculos);
+
+    if (!mostrar) {
+      return;
+    }
 
     if (vinculos.length === 0) {
       perfilVinculos.appendChild(createTableMessageRow(5, "Você ainda não possui vínculos com grupos."));
@@ -166,7 +201,7 @@ document.addEventListener("DOMContentLoaded", function () {
       btnAtivar.textContent = Number(vinculo.grupoId) === Number(sessaoAtual.grupoAtivoId) ? "Ativo" : "Selecionar";
       btnAtivar.disabled = Number(vinculo.grupoId) === Number(sessaoAtual.grupoAtivoId);
       btnAtivar.addEventListener("click", async function () {
-        await executarAcaoBotao(btnAtivar, "Selecionando grupo ativo...", async function () {
+        await executarAcaoBotao(btnAtivar, "Selecionando grupo...", async function () {
           await selecionarGrupoAtivo(vinculo.grupoId);
         });
       });
@@ -175,13 +210,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (vinculo.status === "convidado") {
       wrapper.appendChild(criarBotao("Aceitar convite", "btn btn-sm btn-success", async function (event) {
-        await executarAcaoBotao(event.currentTarget, "Salvando decisão...", async function () {
+        await executarAcaoBotao(event.currentTarget, "Salvando...", async function () {
           await aceitarOuRecusarConvite(vinculo.id, "aceitar");
         });
       }));
 
       wrapper.appendChild(criarBotao("Recusar convite", "btn btn-sm btn-outline-danger", async function (event) {
-        await executarAcaoBotao(event.currentTarget, "Salvando decisão...", async function () {
+        await executarAcaoBotao(event.currentTarget, "Salvando...", async function () {
           await aceitarOuRecusarConvite(vinculo.id, "recusar");
         });
       }));
@@ -189,7 +224,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (vinculo.status === "pendente") {
       wrapper.appendChild(criarBotao("Cancelar solicitação", "btn btn-sm btn-outline-warning", async function (event) {
-        await executarAcaoBotao(event.currentTarget, "Cancelando solicitação...", async function () {
+        await executarAcaoBotao(event.currentTarget, "Cancelando...", async function () {
           await cancelarSolicitacao(vinculo.id);
         });
       }));
@@ -221,11 +256,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function carregarMembros() {
-    renderizarLoadingTabela(perfilMembros, 5, 3);
+    renderizarLoadingTabela(perfilMembros, isAdminGrupoOuSistema() ? 5 : 4, 3);
 
     if (!sessaoAtual.grupoId) {
       clearElement(perfilMembros);
-      perfilMembros.appendChild(createTableMessageRow(5, "Selecione um grupo ativo para visualizar membros."));
+      perfilMembros.appendChild(createTableMessageRow(isAdminGrupoOuSistema() ? 5 : 4, "Selecione um grupo para visualizar membros."));
       return;
     }
 
@@ -233,13 +268,13 @@ document.addEventListener("DOMContentLoaded", function () {
     clearElement(perfilMembros);
 
     if (!resposta.ok) {
-      perfilMembros.appendChild(createTableMessageRow(5, "Não foi possível carregar membros do grupo ativo."));
+      perfilMembros.appendChild(createTableMessageRow(isAdminGrupoOuSistema() ? 5 : 4, "Não foi possível carregar os membros do grupo."));
       return;
     }
 
     const membros = Array.isArray(dados) ? dados : dados.membros || [];
     if (membros.length === 0) {
-      perfilMembros.appendChild(createTableMessageRow(5, "Nenhum membro encontrado no grupo ativo."));
+      perfilMembros.appendChild(createTableMessageRow(isAdminGrupoOuSistema() ? 5 : 4, "Nenhum membro encontrado."));
       return;
     }
 
@@ -255,7 +290,11 @@ document.addEventListener("DOMContentLoaded", function () {
       tr.appendChild(createTextCell(email));
       tr.appendChild(createTextCell(papel));
       tr.appendChild(createTextCell(status));
-      tr.appendChild(criarCelulaAcoesMembro(membro));
+
+      if (isAdminGrupoOuSistema()) {
+        tr.appendChild(criarCelulaAcoesMembro(membro));
+      }
+
       perfilMembros.appendChild(tr);
     });
   }
@@ -266,13 +305,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const wrapper = document.createElement("div");
     wrapper.className = "d-flex justify-content-end gap-2 flex-wrap";
 
-    if (papelAtual === "admingrupo" && membro.status === "aceito") {
+    if (isAdminGrupoOuSistema() && membro.status === "aceito") {
       const novoPapel = membro.papel === "adminGrupo" ? "membro" : "adminGrupo";
       wrapper.appendChild(criarBotao(
         novoPapel === "adminGrupo" ? "Promover" : "Rebaixar",
         "btn btn-sm btn-outline-secondary",
         async function (event) {
-          await executarAcaoBotao(event.currentTarget, "Atualizando papel do membro...", async function () {
+          await executarAcaoBotao(event.currentTarget, "Atualizando...", async function () {
             await alterarPapelMembro(membro.usuarioId || membro.usuario?.id, novoPapel);
           });
         }
@@ -280,7 +319,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (Number(membro.usuarioId || membro.usuario?.id) !== Number(sessaoAtual.id)) {
         wrapper.appendChild(criarBotao("Remover", "btn btn-sm btn-outline-danger", async function (event) {
-          await executarAcaoBotao(event.currentTarget, "Removendo membro...", async function () {
+          await executarAcaoBotao(event.currentTarget, "Removendo...", async function () {
             await removerMembro(membro.usuarioId || membro.usuario?.id);
           });
         }));
@@ -307,7 +346,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function sairDoGrupo() {
     try {
-      await executarAcaoBotao(btnSairGrupo, "Saindo do grupo ativo...", async function () {
+      await executarAcaoBotao(btnSairGrupo, "Saindo do grupo...", async function () {
         const { response: resposta, data: dados } = await apiPost("/meu-grupo/sair", {});
         if (!resposta.ok) throw new Error(dados.erro || "Falha ao sair do grupo.");
         exibirMensagem("Saída do grupo registrada com sucesso.", "success");
@@ -320,30 +359,30 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function carregarSolicitacoes() {
+    if (!secaoPendencias || secaoPendencias.hidden) {
+      clearElement(perfilSolicitacoes);
+      return;
+    }
+
     renderizarLoadingTabela(perfilSolicitacoes, 5, 2);
 
     if (!sessaoAtual.grupoId) {
       clearElement(perfilSolicitacoes);
-      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Selecione um grupo ativo para visualizar pendências."));
+      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Selecione um grupo para visualizar pendências."));
       return;
     }
 
     const { response: resposta, data: dados } = await apiGet("/meu-grupo/solicitacoes");
     clearElement(perfilSolicitacoes);
 
-    if (resposta.status === 403 || papelAtual !== "admingrupo") {
-      if (perfilAdminAviso) perfilAdminAviso.textContent = "Somente adminGrupo aprova solicitações e convites.";
-      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Sem permissão para visualizar pendências."));
+    if (!resposta.ok) {
+      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Não foi possível carregar as pendências."));
       return;
     }
 
-    if (!resposta.ok) throw new Error(dados.erro || "Falha ao carregar pendências.");
-
-    if (perfilAdminAviso) perfilAdminAviso.textContent = "";
-
     const solicitacoes = Array.isArray(dados) ? dados : dados.solicitacoes || [];
     if (solicitacoes.length === 0) {
-      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Nenhuma pendência encontrada no grupo ativo."));
+      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Nenhuma pendência encontrada."));
       return;
     }
 
@@ -360,25 +399,25 @@ document.addEventListener("DOMContentLoaded", function () {
       tr.appendChild(createTextCell(email));
       tr.appendChild(createTextCell(papel));
       tr.appendChild(createTextCell(status));
-      tr.appendChild(createActionsCell(id));
+      tr.appendChild(criarAcoesPendencia(id));
       perfilSolicitacoes.appendChild(tr);
     });
   }
 
-  function createActionsCell(id) {
+  function criarAcoesPendencia(id) {
     const td = document.createElement("td");
     td.className = "text-end";
     const wrapper = document.createElement("div");
     wrapper.className = "d-flex justify-content-end gap-2";
 
     wrapper.appendChild(criarBotao("Aceitar", "btn btn-sm btn-success", async function (event) {
-      await executarAcaoBotao(event.currentTarget, "Salvando decisão...", async function () {
+      await executarAcaoBotao(event.currentTarget, "Salvando...", async function () {
         await decidirSolicitacao(id, "aceitar");
       });
     }));
 
     wrapper.appendChild(criarBotao("Recusar", "btn btn-sm btn-outline-danger", async function (event) {
-      await executarAcaoBotao(event.currentTarget, "Salvando decisão...", async function () {
+      await executarAcaoBotao(event.currentTarget, "Salvando...", async function () {
         await decidirSolicitacao(id, "recusar");
       });
     }));
@@ -406,12 +445,6 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!payload.nome) {
         setFieldError(inputNome, "Preencha o nome.");
         inputNome.focus();
-        return;
-      }
-
-      if (!payload.sobrenome) {
-        setFieldError(inputSobrenome, "Preencha o sobrenome.");
-        inputSobrenome.focus();
         return;
       }
 
@@ -521,15 +554,10 @@ document.addEventListener("DOMContentLoaded", function () {
     renderKeyValueRows(perfilDados, [
       ["Nome completo", "Carregando..."],
       ["E-mail", "Carregando..."],
-      ["Papel global", "Carregando..."],
-      ["Admin do sistema", "Carregando..."],
       ["Grupo ativo", "Carregando..."],
-      ["Código do grupo ativo", "Carregando..."],
-      ["Papel no grupo ativo", "Carregando..."],
       ["Status atual", "Carregando..."]
     ]);
 
-    renderizarLoadingTabela(perfilVinculos, 5, 2);
     renderizarLoadingTabela(perfilMembros, 5, 2);
     renderizarLoadingTabela(perfilSolicitacoes, 5, 2);
   }
@@ -557,6 +585,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function exibirMensagem(texto, variante) {
     if (!perfilMessage) return;
-    setFeedbackMessage(perfilMessage, texto, variante, { classeBase: "small mt-3" });
+    setFeedbackMessage(perfilMessage, texto, variante, { classeBase: "small" });
   }
 });
