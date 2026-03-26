@@ -6,6 +6,15 @@ const { Prisma } = require("@prisma/client");
 const validateSchema = require("../middlewares/validateSchema");
 const { anexarContextoErro } = require("../utils/errorUtils");
 const {
+  construirFiltroData,
+  construirPaginacao,
+  construirMetaPaginacao,
+  anexarHeadersPaginacao,
+  construirIntervaloDatasQuery,
+  obterTextoBuscaQuery,
+  obterOrdenacaoQuery,
+} = require("../utils/queryFilters");
+const {
   grupoItemIdParamSchema,
   grupoItemCreateBodySchema,
   grupoItemUpdateBodySchema,
@@ -25,35 +34,32 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
   app.get("/grupo-itens", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
+      const { page, limit, skip, take } = construirPaginacao(req.query);
+      const busca = obterTextoBuscaQuery(req.query);
+      const { de, ate } = construirIntervaloDatasQuery(req.query);
+      const { campo, direcao } = obterOrdenacaoQuery(req.query, "categoria", "asc");
+      const where = construirWhereGrupoItens({ grupoId, busca, de, ate, comprar: req.query.comprar });
+      const orderBy = construirOrderByGrupoItens(campo, direcao);
 
-      const grupoItens = await prisma.grupoItem.findMany({
-        where: {
-          grupoId,
-        },
-        orderBy: [
-          {
+      const [total, grupoItens] = await prisma.$transaction([
+        prisma.grupoItem.count({ where }),
+        prisma.grupoItem.findMany({
+          where,
+          orderBy,
+          skip,
+          take,
+          include: {
             item: {
-              categoria: {
-                nome: "asc",
+              include: {
+                categoria: true,
               },
             },
+            grupo: true,
           },
-          {
-            item: {
-              nome: "asc",
-            },
-          },
-        ],
-        include: {
-          item: {
-            include: {
-              categoria: true,
-            },
-          },
-          grupo: true,
-        },
-      });
+        }),
+      ]);
 
+      anexarHeadersPaginacao(res, construirMetaPaginacao(total, page, limit));
       res.json(grupoItens);
     } catch (error) {
       return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar itens do grupo" }));
@@ -196,8 +202,6 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
       res.status(201).json(grupoItem);
     } catch (error) {
-      
-
       if (error.code === "P2002") {
         return res.status(409).json({ erro: "Esse item já está vinculado ao grupo" });
       }
@@ -251,7 +255,6 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json(grupoItem);
       } catch (error) {
-        
         return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar item do grupo" }));
       }
     }
@@ -336,7 +339,6 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json(grupoItem);
       } catch (error) {
-        
         return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar quantidade do item do grupo" }));
       }
     }
@@ -368,11 +370,84 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
         res.json({ mensagem: "Item removido do grupo com sucesso" });
       } catch (error) {
-        
         return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir item do grupo" }));
       }
     }
   );
+
+  function construirWhereGrupoItens({ grupoId, busca, de, ate, comprar }) {
+    const where = {
+      grupoId,
+      ...construirFiltroData({ de, ate, campo: "atualizadoEm" }),
+    };
+
+    if (comprar !== undefined) {
+      const texto = String(comprar).trim().toLowerCase();
+      if (texto === "true") {
+        where.comprar = true;
+      } else if (texto === "false") {
+        where.comprar = false;
+      }
+    }
+
+    if (busca) {
+      where.OR = [
+        {
+          item: {
+            nome: {
+              contains: busca,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          item: {
+            unidadePadrao: {
+              contains: busca,
+              mode: "insensitive",
+            },
+          },
+        },
+        {
+          item: {
+            categoria: {
+              nome: {
+                contains: busca,
+                mode: "insensitive",
+              },
+            },
+          },
+        },
+      ];
+    }
+
+    return where;
+  }
+
+  function construirOrderByGrupoItens(campo, direcao) {
+    switch (campo) {
+      case "id":
+        return { id: direcao };
+      case "item":
+      case "nome":
+        return [{ item: { nome: direcao } }, { atualizadoEm: "desc" }];
+      case "categoria":
+        return [
+          { item: { categoria: { nome: direcao } } },
+          { item: { nome: "asc" } },
+        ];
+      case "quantidade":
+        return [{ quantidade: direcao }, { item: { nome: "asc" } }];
+      case "comprar":
+        return [{ comprar: direcao }, { item: { nome: "asc" } }];
+      case "criadoEm":
+        return [{ criadoEm: direcao }, { item: { nome: "asc" } }];
+      case "atualizadoEm":
+      case "data":
+      default:
+        return [{ atualizadoEm: direcao }, { item: { nome: "asc" } }];
+    }
+  }
 
   async function encontrarOuCriarCategoriaTx(tx, nomeCategoria) {
     const nome = normalizarTextoSimples(nomeCategoria);

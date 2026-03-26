@@ -1,6 +1,7 @@
 /**
  * Este arquivo reúne schemas das rotas de usuários.
- * Ele existe para padronizar criação, atualização e identificação de usuários.
+ * Ele existe para padronizar criação e identificação de usuários.
+ * A conta global não pode ser editada por adminGrupo.
  */
 const {
   z,
@@ -8,7 +9,6 @@ const {
   idParamSchema,
   emailSchema,
   senhaObrigatoriaSchema,
-  senhaOpcionalSchema,
   booleanOpcionalSchema,
 } = require("./commonSchemas");
 
@@ -20,16 +20,7 @@ const usuarioCreateBodySchema = z.object({
   ativo: booleanOpcionalSchema,
 });
 
-const usuarioUpdateBodySchema = z.object({
-  nome: textoObrigatorio("nome"),
-  sobrenome: textoObrigatorio("sobrenome"),
-  email: emailSchema,
-  senha: senhaOpcionalSchema,
-  ativo: booleanOpcionalSchema,
-});
-
 module.exports = {
   usuarioIdParamSchema: idParamSchema,
   usuarioCreateBodySchema,
-  usuarioUpdateBodySchema,
 };
