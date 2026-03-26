@@ -33,7 +33,6 @@ function createSessionService(prisma) {
         nome: true,
         sobrenome: true,
         email: true,
-        papelGlobal: true,
         grupoAtivoId: true,
         ativo: true,
         desativadoEm: true,
@@ -74,7 +73,7 @@ function createSessionService(prisma) {
       return null;
     }
 
-    const adminSistema = usuario.papelGlobal === "adminSistema";
+    const adminSistema = false;
     const vinculosRelevantes = (usuario.usuariosGrupos || []).filter((vinculo) =>
       ["pendente", "convidado", "aceito", "recusado", "removido", "saiu", "cancelado"].includes(vinculo.status)
     );
@@ -89,7 +88,8 @@ function createSessionService(prisma) {
     let vinculoAtivo = null;
 
     if (usuario.grupoAtivoId) {
-      vinculoAtivo = vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === Number(usuario.grupoAtivoId)) || null;
+      vinculoAtivo =
+        vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === Number(usuario.grupoAtivoId)) || null;
     }
 
     if (!vinculoAtivo && vinculosAceitos.length === 1) {
@@ -104,7 +104,7 @@ function createSessionService(prisma) {
       sobrenome: usuario.sobrenome || "",
       nomeCompleto: montarNomeCompleto(usuario.nome, usuario.sobrenome),
       email: usuario.email,
-      papelGlobal: usuario.papelGlobal || "usuario",
+      papelGlobal: "usuario",
       adminSistema,
       ativo: Boolean(usuario.ativo),
       desativadoEm: usuario.desativadoEm,
