@@ -26,16 +26,11 @@
             </button>
 
             <a href="homepage.html" class="btn btn-primary btn-sm" aria-current="page">Home</a>
-            <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-            <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
-            <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-            <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
             <a href="perfil.html" class="btn btn-outline-secondary btn-sm">Perfil</a>
             <a href="painel-sistema.html" class="btn btn-outline-dark btn-sm" id="link-painel-sistema" hidden>Painel do Sistema</a>
           </div>
 
           <div class="d-flex flex-wrap gap-2 align-items-center">
-            <span class="small text-muted" id="usuario-logado" aria-live="polite">Carregando sessão...</span>
             <button type="button" class="btn btn-outline-danger btn-sm" id="btn-logout">
               Sair
             </button>
@@ -60,7 +55,7 @@
     >
       <div class="p-3">
         <div class="d-flex justify-content-between align-items-center mb-3 d-lg-none">
-          <h2 class="h6 mb-0">Mapa do site</h2>
+          <h2 class="h6 mb-0">Menu</h2>
           <button
             type="button"
             class="btn btn-outline-secondary btn-sm"
@@ -71,14 +66,14 @@
           </button>
         </div>
 
-        <h2 class="h6 mb-3 d-none d-lg-block">Mapa do site</h2>
+        <h2 class="h6 mb-3 d-none d-lg-block">Menu</h2>
 
         <div class="d-grid gap-2">
           <a href="homepage.html" class="btn btn-primary btn-sm" aria-current="page">Home</a>
           <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
           <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
           <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+          <a href="perfil.html" class="btn btn-outline-secondary btn-sm">Perfil</a>
         </div>
       </div>
     </div>
@@ -92,113 +87,46 @@
   ></div>
 
   <div class="container py-4">
-    <main>
-      <header class="mb-4">
-        <h1 class="h3 mb-1">Controle de Compras</h1>
-        <p class="text-muted mb-0">Página inicial do sistema</p>
-      </header>
-
-      <section class="app-box mb-4" aria-labelledby="sessao-titulo">
-        <h2 class="h5 mb-3" id="sessao-titulo">Sessão atual</h2>
-        <div id="sessao-info" class="small text-muted" aria-live="polite">Carregando dados da sessão...</div>
-      </section>
-
-      <section class="app-box mb-4" aria-labelledby="home-introducao-titulo">
-        <h2 class="h4 mb-3" id="home-introducao-titulo">Home</h2>
-        <p>
-          Este sistema foi organizado em quatro áreas principais: Estoque, Lista, Compra e Consumo.
-        </p>
-        <p class="mb-0">
-          Clique em uma das opções abaixo para acessar a página correspondente.
-        </p>
-      </section>
-
-      <section class="app-box mb-4" aria-labelledby="estado-atual-titulo">
-        <h2 class="h5 mb-3" id="estado-atual-titulo">Estado atual do projeto</h2>
-        <p>
-          O sistema já trabalha com autenticação, sessão real, catálogo global, estoque por grupo, lista por grupo e integração principal com backend real.
-        </p>
-        <p class="mb-0">
-          As pendências centrais agora estão no fechamento completo do fluxo de compra e no uso de dados reais para análises de consumo e compras.
-        </p>
-      </section>
-
-      <section aria-labelledby="atalhos-titulo">
-        <h2 class="visually-hidden" id="atalhos-titulo">Atalhos principais</h2>
-
+    <main class="home-main">
+      <section aria-label="Acessos principais">
         <div class="row g-3">
-          <div class="col-md-6 col-lg-3">
+          <div class="col-sm-6 col-lg-3">
             <a href="estoque.html" class="text-decoration-none text-reset">
-              <div class="app-box home-card h-100">
-                <h3 class="h5">Estoque</h3>
-                <p class="mb-0">
-                  Mostra todos os itens cadastrados, a quantidade disponível, a categoria dinâmica de cada item e os controles de filtro e ordenação.
-                </p>
+              <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
+                <h1 class="h4 mb-0 text-center">Estoque</h1>
               </div>
             </a>
           </div>
 
-          <div class="col-md-6 col-lg-3">
+          <div class="col-sm-6 col-lg-3">
             <a href="lista.html" class="text-decoration-none text-reset">
-              <div class="app-box home-card h-100">
-                <h3 class="h5">Lista</h3>
-                <p class="mb-0">
-                  Exibe os itens usados para organizar o que precisa ser comprado e já trabalha com a lógica real do checkbox Comprar integrada ao backend.
-                </p>
+              <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
+                <h2 class="h4 mb-0 text-center">Lista</h2>
               </div>
             </a>
           </div>
 
-          <div class="col-md-6 col-lg-3">
+          <div class="col-sm-6 col-lg-3">
             <a href="compra.html" class="text-decoration-none text-reset">
-              <div class="app-box home-card h-100">
-                <h3 class="h5">Compra</h3>
-                <p class="mb-0">
-                  Registra o que foi comprado de fato, trabalha com categoria dinâmica, permite filtros e ordenação e atualiza o estoque ao finalizar a compra.
-                </p>
+              <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
+                <h2 class="h4 mb-0 text-center">Compra</h2>
               </div>
             </a>
           </div>
 
-          <div class="col-md-6 col-lg-3">
-            <a href="consumo.html" class="text-decoration-none text-reset">
-              <div class="app-box home-card h-100">
-                <h3 class="h5">Consumo</h3>
-                <p class="mb-0">
-                  Acompanha médias de consumo e médias de compras com filtros, ordenação e visualizações em tabela, lista e gráficos.
-                </p>
+          <div class="col-sm-6 col-lg-3">
+            <a href="perfil.html" class="text-decoration-none text-reset">
+              <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
+                <h2 class="h4 mb-0 text-center">Perfil</h2>
               </div>
             </a>
           </div>
         </div>
-      </section>
 
-      <section class="app-box mt-4" aria-labelledby="fluxo-uso-titulo">
-        <h2 class="h5" id="fluxo-uso-titulo">Fluxo de uso</h2>
-        <ol class="mb-0">
-          <li>Consultar os itens cadastrados no estoque.</li>
-          <li>Verificar os itens com quantidade baixa ou igual a zero.</li>
-          <li>Usar a lista como apoio para organizar o que precisa ser comprado.</li>
-          <li>Marcar ou desmarcar corretamente os itens na lista conforme a necessidade de compra.</li>
-          <li>Registrar a compra real na página de compra.</li>
-          <li>Atualizar automaticamente o estoque ao finalizar a compra.</li>
-          <li>Acompanhar o histórico de consumo e de compras na página de consumo.</li>
-        </ol>
+        <div id="homepage-message" class="small mt-3" hidden aria-live="polite" aria-atomic="true"></div>
       </section>
     </main>
   </div>
-
-  <footer class="site-map-bottom mt-4">
-    <div class="container py-3">
-      <div class="d-flex flex-wrap gap-2 justify-content-center">
-        <a href="homepage.html" class="btn btn-primary btn-sm" aria-current="page">Home</a>
-        <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-        <a href="lista.html" class="btn btn-outline-secondary btn-sm">Lista</a>
-        <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-        <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-      </div>
-    </div>
-  </footer>
 
   <script type="module" src="js/homepage.js"></script>
 </body>
