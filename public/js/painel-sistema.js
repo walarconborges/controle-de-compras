@@ -1,6 +1,7 @@
 import { apiGet, apiPatch } from "./api.js";
 import { ensureAdminSistemaSession } from "./auth.js";
 import { clearElement, createTableMessageRow, createTextCell, renderKeyValueRows } from "./dom.js";
+import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
 
 document.addEventListener("DOMContentLoaded", function () {
   const resumo = document.getElementById("painel-resumo");
@@ -9,6 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const tbodyGrupos = document.getElementById("painel-grupos");
   const tbodyLogs = document.getElementById("painel-logs");
   const btnFiltrarLogs = document.getElementById("btn-filtrar-logs");
+  const painelMessage = ensurePainelMessage();
 
   const filtroEntidade = document.getElementById("filtro-entidade");
   const filtroAcao = document.getElementById("filtro-acao");
@@ -22,6 +24,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function inicializar() {
     try {
+      exibirMensagem("Carregando Painel do Sistema...", "muted");
+      renderizarLoadingResumo();
+      renderizarLoadingTabela(tbodyPendencias, 5, 3);
+      renderizarLoadingTabela(tbodyUsuarios, 5, 4);
+      renderizarLoadingTabela(tbodyGrupos, 4, 4);
+      renderizarLoadingTabela(tbodyLogs, 6, 5);
+
       await ensureAdminSistemaSession();
       await Promise.all([
         carregarResumo(),
@@ -30,15 +39,22 @@ document.addEventListener("DOMContentLoaded", function () {
         carregarGrupos(),
         carregarLogs()
       ]);
+
+      limparMensagem();
     } catch (error) {
       console.error(error);
+      exibirMensagem("Não foi possível carregar o Painel do Sistema.", "danger");
       window.location.replace("perfil.html");
     }
   }
 
   async function carregarResumo() {
     const { response, data } = await apiGet("/painel-sistema/resumo");
-    if (!response.ok) return;
+    if (!response.ok) {
+      renderKeyValueRows(resumo, [["Resumo", "Não foi possível carregar."]]);
+      return;
+    }
+
     renderKeyValueRows(resumo, [
       ["Usuários", data.usuarios ?? 0],
       ["Grupos", data.grupos ?? 0],
@@ -49,8 +65,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function carregarPendencias() {
-    clearElement(tbodyPendencias);
+    renderizarLoadingTabela(tbodyPendencias, 5, 2);
     const { response, data } = await apiGet("/painel-sistema/pendencias");
+
+    clearElement(tbodyPendencias);
+
     if (!response.ok) {
       tbodyPendencias.appendChild(createTableMessageRow(5, "Não foi possível carregar pendências."));
       return;
@@ -58,13 +77,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const pendencias = Array.isArray(data) ? data : [];
     if (!pendencias.length) {
-      tbodyPendencias.appendChild(createTableMessageRow(5, "Nenhuma pendência global."));
+      tbodyPendencias.appendChild(createTableMessageRow(5, "Nenhuma pendência global no momento."));
       return;
     }
 
     pendencias.forEach(function (registro) {
       const tr = document.createElement("tr");
-      tr.appendChild(createTextCell([registro.usuario?.nome, registro.usuario?.sobrenome].filter(Boolean).join(" ")));
+      tr.appendChild(createTextCell([registro.usuario?.nome, registro.usuario?.sobrenome].filter(Boolean).join(" ") || "-"));
       tr.appendChild(createTextCell(registro.grupo?.nome || "-"));
       tr.appendChild(createTextCell(registro.papel || "-"));
       tr.appendChild(createTextCell(registro.status || "-"));
@@ -74,16 +93,20 @@ document.addEventListener("DOMContentLoaded", function () {
       const wrapper = document.createElement("div");
       wrapper.className = "d-flex justify-content-end gap-2";
 
-      wrapper.appendChild(criarBotao("Aprovar", "btn btn-sm btn-success", async function () {
-        await apiPatch(`/painel-sistema/usuarios-grupos/${registro.id}/aprovar`, {});
-        await carregarPendencias();
-        await carregarResumo();
+      wrapper.appendChild(criarBotao("Aprovar", "btn btn-sm btn-success", async function (event) {
+        await executarAcaoBotao(event.currentTarget, "Aprovando pendência...", async function () {
+          await apiPatch(`/painel-sistema/usuarios-grupos/${registro.id}/aprovar`, {});
+          await carregarPendencias();
+          await carregarResumo();
+        });
       }));
 
-      wrapper.appendChild(criarBotao("Recusar", "btn btn-sm btn-outline-danger", async function () {
-        await apiPatch(`/painel-sistema/usuarios-grupos/${registro.id}/recusar`, {});
-        await carregarPendencias();
-        await carregarResumo();
+      wrapper.appendChild(criarBotao("Recusar", "btn btn-sm btn-outline-danger", async function (event) {
+        await executarAcaoBotao(event.currentTarget, "Recusando pendência...", async function () {
+          await apiPatch(`/painel-sistema/usuarios-grupos/${registro.id}/recusar`, {});
+          await carregarPendencias();
+          await carregarResumo();
+        });
       }));
 
       tdAcoes.appendChild(wrapper);
@@ -93,14 +116,23 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function carregarUsuarios() {
-    clearElement(tbodyUsuarios);
+    renderizarLoadingTabela(tbodyUsuarios, 5, 3);
     const { response, data } = await apiGet("/painel-sistema/usuarios");
+
+    clearElement(tbodyUsuarios);
+
     if (!response.ok) {
       tbodyUsuarios.appendChild(createTableMessageRow(5, "Não foi possível carregar usuários."));
       return;
     }
 
-    data.forEach(function (usuario) {
+    const usuarios = Array.isArray(data) ? data : [];
+    if (!usuarios.length) {
+      tbodyUsuarios.appendChild(createTableMessageRow(5, "Nenhum usuário encontrado."));
+      return;
+    }
+
+    usuarios.forEach(function (usuario) {
       const tr = document.createElement("tr");
       tr.appendChild(createTextCell(usuario.id));
       tr.appendChild(createTextCell([usuario.nome, usuario.sobrenome].filter(Boolean).join(" ")));
@@ -112,14 +144,23 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function carregarGrupos() {
-    clearElement(tbodyGrupos);
+    renderizarLoadingTabela(tbodyGrupos, 4, 3);
     const { response, data } = await apiGet("/painel-sistema/grupos");
+
+    clearElement(tbodyGrupos);
+
     if (!response.ok) {
       tbodyGrupos.appendChild(createTableMessageRow(4, "Não foi possível carregar grupos."));
       return;
     }
 
-    data.forEach(function (grupo) {
+    const grupos = Array.isArray(data) ? data : [];
+    if (!grupos.length) {
+      tbodyGrupos.appendChild(createTableMessageRow(4, "Nenhum grupo encontrado."));
+      return;
+    }
+
+    grupos.forEach(function (grupo) {
       const tr = document.createElement("tr");
       tr.appendChild(createTextCell(grupo.id));
       tr.appendChild(createTextCell(grupo.nome || "-"));
@@ -130,35 +171,52 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   async function carregarLogs() {
-    clearElement(tbodyLogs);
+    renderizarLoadingTabela(tbodyLogs, 6, 4);
 
-    const params = new URLSearchParams();
-    if (filtroEntidade.value.trim()) params.set("entidade", filtroEntidade.value.trim());
-    if (filtroAcao.value.trim()) params.set("acao", filtroAcao.value.trim());
-    if (filtroUsuario.value.trim()) params.set("usuarioId", filtroUsuario.value.trim());
-
-    const { response, data } = await apiGet(`/painel-sistema/logs?${params.toString()}`);
-    if (!response.ok) {
-      tbodyLogs.appendChild(createTableMessageRow(6, "Não foi possível carregar logs."));
-      return;
+    if (btnFiltrarLogs) {
+      btnFiltrarLogs.disabled = true;
+      btnFiltrarLogs.textContent = "Filtrando...";
     }
 
-    const logs = Array.isArray(data) ? data : [];
-    if (!logs.length) {
-      tbodyLogs.appendChild(createTableMessageRow(6, "Nenhum log encontrado."));
-      return;
-    }
+    try {
+      const params = new URLSearchParams();
+      if (filtroEntidade && filtroEntidade.value.trim()) params.set("entidade", filtroEntidade.value.trim());
+      if (filtroAcao && filtroAcao.value.trim()) params.set("acao", filtroAcao.value.trim());
+      if (filtroUsuario && filtroUsuario.value.trim()) params.set("usuarioId", filtroUsuario.value.trim());
 
-    logs.forEach(function (log) {
-      const tr = document.createElement("tr");
-      tr.appendChild(createTextCell(formatarData(log.criadoEm)));
-      tr.appendChild(createTextCell(log.entidade || "-"));
-      tr.appendChild(createTextCell(log.acao || "-"));
-      tr.appendChild(createTextCell(log.usuarioAutor ? `${log.usuarioAutor.id} - ${log.usuarioAutor.nome}` : "-"));
-      tr.appendChild(createTextCell(log.grupo ? `${log.grupo.id} - ${log.grupo.nome}` : "-"));
-      tr.appendChild(createTextCell(log.descricao || "-"));
-      tbodyLogs.appendChild(tr);
-    });
+      const queryString = params.toString();
+      const rota = queryString ? `/painel-sistema/logs?${queryString}` : "/painel-sistema/logs";
+      const { response, data } = await apiGet(rota);
+
+      clearElement(tbodyLogs);
+
+      if (!response.ok) {
+        tbodyLogs.appendChild(createTableMessageRow(6, "Não foi possível carregar logs."));
+        return;
+      }
+
+      const logs = Array.isArray(data) ? data : [];
+      if (!logs.length) {
+        tbodyLogs.appendChild(createTableMessageRow(6, "Nenhum log encontrado para os filtros informados."));
+        return;
+      }
+
+      logs.forEach(function (log) {
+        const tr = document.createElement("tr");
+        tr.appendChild(createTextCell(formatarData(log.criadoEm)));
+        tr.appendChild(createTextCell(log.entidade || "-"));
+        tr.appendChild(createTextCell(log.acao || "-"));
+        tr.appendChild(createTextCell(log.usuarioAutor ? `${log.usuarioAutor.id} - ${log.usuarioAutor.nome}` : "-"));
+        tr.appendChild(createTextCell(log.grupo ? `${log.grupo.id} - ${log.grupo.nome}` : "-"));
+        tr.appendChild(createTextCell(log.descricao || "-"));
+        tbodyLogs.appendChild(tr);
+      });
+    } finally {
+      if (btnFiltrarLogs) {
+        btnFiltrarLogs.disabled = false;
+        btnFiltrarLogs.textContent = "Filtrar logs";
+      }
+    }
   }
 
   function criarBotao(texto, classe, onClick) {
@@ -168,6 +226,88 @@ document.addEventListener("DOMContentLoaded", function () {
     button.textContent = texto;
     button.addEventListener("click", onClick);
     return button;
+  }
+
+  async function executarAcaoBotao(botao, mensagem, callback) {
+    const textoOriginal = botao ? botao.textContent : "";
+    if (botao) {
+      botao.disabled = true;
+      botao.textContent = "Salvando...";
+    }
+
+    try {
+      exibirMensagem(mensagem, "muted");
+      await callback();
+      exibirMensagem("Ação concluída com sucesso.", "success");
+    } catch (error) {
+      console.error(error);
+      exibirMensagem("Não foi possível concluir a ação.", "danger");
+    } finally {
+      if (botao) {
+        botao.disabled = false;
+        botao.textContent = textoOriginal;
+      }
+    }
+  }
+
+  function renderizarLoadingResumo() {
+    renderKeyValueRows(resumo, [
+      ["Usuários", "Carregando..."],
+      ["Grupos", "Carregando..."],
+      ["Itens", "Carregando..."],
+      ["Pendências", "Carregando..."],
+      ["Logs", "Carregando..."]
+    ]);
+  }
+
+  function renderizarLoadingTabela(tbody, totalColunas, totalLinhas) {
+    if (!tbody) {
+      return;
+    }
+
+    clearElement(tbody);
+
+    for (let linha = 0; linha < totalLinhas; linha += 1) {
+      const tr = document.createElement("tr");
+
+      for (let coluna = 0; coluna < totalColunas; coluna += 1) {
+        const td = document.createElement("td");
+        td.className = "text-secondary";
+        td.textContent = "Carregando...";
+        tr.appendChild(td);
+      }
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function ensurePainelMessage() {
+    const existente = document.getElementById("painel-message");
+    if (existente) {
+      return existente;
+    }
+
+    const mensagem = document.createElement("div");
+    mensagem.id = "painel-message";
+    mensagem.className = "small mb-3";
+    mensagem.hidden = true;
+
+    const referencia = resumo && resumo.parentElement ? resumo.parentElement : document.body;
+    referencia.parentElement.insertBefore(mensagem, referencia);
+
+    return mensagem;
+  }
+
+  function exibirMensagem(texto, variante) {
+    setFeedbackMessage(painelMessage, texto, variante, {
+      classeBase: "small mb-3"
+    });
+  }
+
+  function limparMensagem() {
+    clearFeedbackMessage(painelMessage, {
+      classeBase: "small mb-3"
+    });
   }
 
   function formatarData(valor) {
