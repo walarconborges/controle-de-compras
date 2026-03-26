@@ -80,6 +80,10 @@ const valorNaoNegativoSchema = z.coerce.number().refine((valor) => Number.isFini
   message: "valorUnitario inválido",
 });
 
+const valorCentavosNaoNegativoSchema = z.coerce.number().int().refine((valor) => Number.isFinite(valor) && valor >= 0, {
+  message: "valorUnitarioCentavos inválido",
+});
+
 const booleanSchema = z.preprocess((valor) => {
   if (typeof valor === "boolean") {
     return valor;
@@ -116,6 +120,7 @@ module.exports = {
   quantidadeNaoNegativaSchema,
   quantidadePositivaSchema,
   valorNaoNegativoSchema,
+  valorCentavosNaoNegativoSchema,
   booleanSchema,
   booleanOpcionalSchema,
 };

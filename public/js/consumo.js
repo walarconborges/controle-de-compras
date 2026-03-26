@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiPatch, apiDelete, readJsonSafe as lerJsonSeguro } from "./api.js";
 import { ensureAcceptedSession } from "./auth.js";
 import { setupMobileMenu } from "./dom.js";
-import { compareText, compareNumber, normalizeText, normalizeCategoryName, normalizeNumber, formatNumber, formatCurrency, formatDate, formatFieldValue } from "./formatters.js";
+import { compareText, compareNumber, normalizeText, normalizeCategoryName, decimalStringToCents, centsToMoneyNumber, formatNumber, formatCurrency, formatDate, formatFieldValue } from "./formatters.js";
 import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
 import { ensureArray, extractListFromResponse, renderFilterSummary, updateCountLabel } from "./filters.js";
 
@@ -294,19 +294,21 @@ document.addEventListener("DOMContentLoaded", function () {
           ).trim();
 
           const quantidade = Number(item.quantidade) || 0;
-          const valorUnitario = Number(item.valorUnitario) || 0;
-          const subtotalInformado = Number(item.subtotal);
-          const subtotal = Number.isNaN(subtotalInformado)
-            ? quantidade * valorUnitario
-            : subtotalInformado;
+          const valorUnitarioCentavos = Number.isInteger(Number(item.valorUnitarioCentavos))
+            ? Number(item.valorUnitarioCentavos)
+            : decimalStringToCents(item.valorUnitario);
+          const subtotalInformadoCentavos = Number(item.subtotalCentavos);
+          const subtotalCentavos = Number.isFinite(subtotalInformadoCentavos)
+            ? subtotalInformadoCentavos
+            : Math.round(quantidade * Number(valorUnitarioCentavos || 0));
 
           return {
             nome: nome,
             categoria: categoria,
             quantidade: quantidade,
             unidade: unidade,
-            valorUnitario: valorUnitario,
-            subtotal: subtotal
+            valorUnitarioCentavos: Number(valorUnitarioCentavos || 0),
+            subtotalCentavos: subtotalCentavos
           };
         }).filter(function (item) {
           return Boolean(item.nome);
@@ -563,9 +565,13 @@ document.addEventListener("DOMContentLoaded", function () {
         const nome = String(item.nome || "").trim();
         const categoria = normalizeCategoryName(item.categoria || "");
         const quantidade = Number(item.quantidade) || 0;
-        const subtotal = Number(item.subtotal);
-        const valorUnitario = Number(item.valorUnitario) || 0;
-        const totalItem = Number.isNaN(subtotal) ? quantidade * valorUnitario : subtotal;
+        const subtotalCentavos = Number(item.subtotalCentavos);
+        const valorUnitarioCentavos = Number.isInteger(Number(item.valorUnitarioCentavos))
+          ? Number(item.valorUnitarioCentavos)
+          : decimalStringToCents(item.valorUnitario);
+        const totalItem = Number.isFinite(subtotalCentavos)
+          ? subtotalCentavos
+          : Math.round(quantidade * Number(valorUnitarioCentavos || 0));
 
         if (!nome) {
           return;
@@ -1404,27 +1410,9 @@ document.addEventListener("DOMContentLoaded", function () {
     updateCountLabel(elemento, quantidade, sufixo);
   }
 
-  function compareText(a, b) {
-    return String(a || "").localeCompare(String(b || ""), "pt-BR", {
-      sensitivity: "base"
-    });
-  }
 
-  function compareNumber(a, b) {
-    return Number(a || 0) - Number(b || 0);
-  }
 
-  function normalizeText(valor) {
-    return String(valor || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim()
-      .toLowerCase();
-  }
 
-  function normalizeCategoryName(valor) {
-    return String(valor || "").trim().replace(/\s+/g, " ");
-  }
 
   function formatDate(valor) {
     const data = new Date(valor);
@@ -1436,18 +1424,6 @@ document.addEventListener("DOMContentLoaded", function () {
     return data.toLocaleDateString("pt-BR");
   }
 
-  function formatNumber(valor) {
-    return Number(valor || 0).toLocaleString("pt-BR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-  }
 
-  function formatCurrency(valor) {
-    return Number(valor || 0).toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    });
-  }
 
 });

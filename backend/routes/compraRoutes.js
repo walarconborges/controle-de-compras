@@ -2,19 +2,10 @@
  * Este arquivo registra rotas de compras e movimentações de estoque.
  * Ele existe para concentrar entrada de compras, histórico e reflexos no estoque do grupo.
  */
-const { Prisma } = require("@prisma/client");
 const validateSchema = require("../middlewares/validateSchema");
+const { centsToDecimalString } = require("../utils/money");
 const { compraBodySchema } = require("../validators/compraSchemas");
 const { anexarContextoErro } = require("../utils/errorUtils");
-const {
-  construirFiltroData,
-  construirPaginacao,
-  construirMetaPaginacao,
-  anexarHeadersPaginacao,
-  construirIntervaloDatasQuery,
-  obterTextoBuscaQuery,
-  obterOrdenacaoQuery,
-} = require("../utils/queryFilters");
 
 module.exports = function registerCompraRoutes(app, deps) {
   const {
@@ -30,43 +21,35 @@ module.exports = function registerCompraRoutes(app, deps) {
   app.get("/compras", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
-      const { page, limit, skip, take } = construirPaginacao(req.query);
-      const busca = obterTextoBuscaQuery(req.query);
-      const { de, ate } = construirIntervaloDatasQuery(req.query);
-      const { campo, direcao } = obterOrdenacaoQuery(req.query, "criadoEm", "desc");
-      const where = construirWhereCompras({ grupoId, busca, de, ate });
-      const orderBy = construirOrderByCompras(campo, direcao);
 
-      const [total, compras] = await prisma.$transaction([
-        prisma.compra.count({ where }),
-        prisma.compra.findMany({
-          where,
-          orderBy,
-          skip,
-          take,
-          include: {
-            usuario: {
-              select: {
-                id: true,
-                nome: true,
-                sobrenome: true,
-                email: true,
-              },
+      const compras = await prisma.compra.findMany({
+        where: {
+          grupoId,
+        },
+        orderBy: {
+          criadoEm: "desc",
+        },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nome: true,
+              sobrenome: true,
+              email: true,
             },
-            compraItens: {
-              include: {
-                item: {
-                  include: {
-                    categoria: true,
-                  },
+          },
+          compraItens: {
+            include: {
+              item: {
+                include: {
+                  categoria: true,
                 },
               },
             },
           },
-        }),
-      ]);
+        },
+      });
 
-      anexarHeadersPaginacao(res, construirMetaPaginacao(total, page, limit));
       res.json(compras.map(normalizarCompraResposta));
     } catch (error) {
       return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar compras" }));
@@ -92,7 +75,7 @@ module.exports = function registerCompraRoutes(app, deps) {
         unidade: normalizarUnidade(item.unidade),
         categoria: normalizarTextoSimples(item.categoria),
         quantidade: item.quantidade,
-        valorUnitario: item.valorUnitario,
+        valorUnitarioCentavos: item.valorUnitarioCentavos,
       }));
 
       const resultado = await prisma.$transaction(async (tx) => {
@@ -118,7 +101,7 @@ module.exports = function registerCompraRoutes(app, deps) {
               nomeItem: itemGlobal.nome,
               quantidade: item.quantidade,
               unidade: item.unidade,
-              valorUnitario: item.valorUnitario,
+              valorUnitario: centsToDecimalString(item.valorUnitarioCentavos),
             },
           });
 
@@ -137,7 +120,7 @@ module.exports = function registerCompraRoutes(app, deps) {
                 id: grupoItemExistente.id,
               },
               data: {
-                quantidade: Number(grupoItemExistente.quantidade) + Number(item.quantidade),
+                quantidade: grupoItemExistente.quantidade.plus(item.quantidade),
                 comprar: false,
               },
             });
@@ -200,40 +183,31 @@ module.exports = function registerCompraRoutes(app, deps) {
   app.get("/movimentacoes-estoque", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
-      const { page, limit, skip, take } = construirPaginacao(req.query);
-      const busca = obterTextoBuscaQuery(req.query);
-      const { de, ate } = construirIntervaloDatasQuery(req.query);
-      const { campo, direcao } = obterOrdenacaoQuery(req.query, "criadoEm", "desc");
-      const where = construirWhereMovimentacoes({ grupoId, busca, de, ate, tipo: req.query.tipo });
-      const orderBy = construirOrderByMovimentacoes(campo, direcao);
 
-      const [total, movimentacoes] = await prisma.$transaction([
-        prisma.movimentacaoEstoque.count({ where }),
-        prisma.movimentacaoEstoque.findMany({
-          where,
-          orderBy,
-          skip,
-          take,
-          include: {
-            item: {
-              include: {
-                categoria: true,
-              },
+      const movimentacoes = await prisma.movimentacaoEstoque.findMany({
+        where: {
+          grupoId,
+        },
+        orderBy: {
+          criadoEm: "desc",
+        },
+        include: {
+          item: {
+            include: {
+              categoria: true,
             },
-            usuario: {
-              select: {
-                id: true,
-                nome: true,
-                sobrenome: true,
-                email: true,
-              },
-            },
-            grupo: true,
           },
-        }),
-      ]);
-
-      anexarHeadersPaginacao(res, construirMetaPaginacao(total, page, limit));
+          usuario: {
+            select: {
+              id: true,
+              nome: true,
+              sobrenome: true,
+              email: true,
+            },
+          },
+          grupo: true,
+        },
+      });
 
       const movimentacoesNormalizadas = movimentacoes.map((movimentacao) => ({
         ...movimentacao,
@@ -245,194 +219,6 @@ module.exports = function registerCompraRoutes(app, deps) {
       return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar movimentações de estoque" }));
     }
   });
-
-  function construirWhereCompras({ grupoId, busca, de, ate }) {
-    const where = {
-      grupoId,
-      ...construirFiltroData({ de, ate, campo: "criadoEm" }),
-    };
-
-    if (busca) {
-      where.OR = [
-        {
-          usuario: {
-            nome: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          usuario: {
-            sobrenome: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          usuario: {
-            email: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          compraItens: {
-            some: {
-              nomeItem: {
-                contains: busca,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
-        {
-          compraItens: {
-            some: {
-              unidade: {
-                contains: busca,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
-        {
-          compraItens: {
-            some: {
-              item: {
-                categoria: {
-                  nome: {
-                    contains: busca,
-                    mode: "insensitive",
-                  },
-                },
-              },
-            },
-          },
-        },
-      ];
-    }
-
-    return where;
-  }
-
-  function construirWhereMovimentacoes({ grupoId, busca, de, ate, tipo }) {
-    const where = {
-      grupoId,
-      ...construirFiltroData({ de, ate, campo: "criadoEm" }),
-    };
-
-    if (tipo) {
-      where.tipo = {
-        equals: String(tipo).trim(),
-        mode: "insensitive",
-      };
-    }
-
-    if (busca) {
-      where.OR = [
-        {
-          tipo: {
-            contains: busca,
-            mode: "insensitive",
-          },
-        },
-        {
-          motivo: {
-            contains: busca,
-            mode: "insensitive",
-          },
-        },
-        {
-          item: {
-            nome: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          item: {
-            categoria: {
-              nome: {
-                contains: busca,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
-        {
-          usuario: {
-            nome: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          usuario: {
-            sobrenome: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-        {
-          usuario: {
-            email: {
-              contains: busca,
-              mode: "insensitive",
-            },
-          },
-        },
-      ];
-    }
-
-    return where;
-  }
-
-  function construirOrderByCompras(campo, direcao) {
-    switch (campo) {
-      case "id":
-        return { id: direcao };
-      case "usuario":
-      case "nomeUsuario":
-        return [{ usuario: { nome: direcao } }, { criadoEm: "desc" }];
-      case "email":
-        return [{ usuario: { email: direcao } }, { criadoEm: "desc" }];
-      case "criadoEm":
-      case "data":
-      default:
-        return { criadoEm: direcao };
-    }
-  }
-
-  function construirOrderByMovimentacoes(campo, direcao) {
-    switch (campo) {
-      case "id":
-        return { id: direcao };
-      case "tipo":
-        return [{ tipo: direcao }, { criadoEm: "desc" }];
-      case "motivo":
-        return [{ motivo: direcao }, { criadoEm: "desc" }];
-      case "item":
-      case "nomeItem":
-        return [{ item: { nome: direcao } }, { criadoEm: "desc" }];
-      case "categoria":
-        return [{ item: { categoria: { nome: direcao } } }, { criadoEm: "desc" }];
-      case "usuario":
-      case "nomeUsuario":
-        return [{ usuario: { nome: direcao } }, { criadoEm: "desc" }];
-      case "quantidade":
-        return [{ quantidade: direcao }, { criadoEm: "desc" }];
-      case "criadoEm":
-      case "data":
-      default:
-        return { criadoEm: direcao };
-    }
-  }
 
   async function encontrarOuCriarCategoriaTx(tx, nomeCategoria) {
     const nome = normalizarTextoSimples(nomeCategoria);

@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiPatch, apiDelete, readJsonSafe as lerJsonSeguro } from "./api.js";
 import { ensureAcceptedSession } from "./auth.js";
 import { setupMobileMenu } from "./dom.js";
-import { compareText, compareNumber, normalizeText, normalizeCategoryName, normalizeNumber, formatNumber, formatCurrency, formatDate, formatFieldValue } from "./formatters.js";
+import { compareText, compareNumber, normalizeText, normalizeCategoryName, normalizeNumber, normalizeMoneyToCents, centsToMoneyNumber, decimalStringToCents, formatNumber, formatCurrency, formatDate, formatFieldValueFromCents } from "./formatters.js";
 import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
 import { ensureArray, extractListFromResponse, renderFilterSummary, updateCountLabel } from "./filters.js";
 
@@ -238,7 +238,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const nome = String(campoItem.value || "").trim();
     const quantidade = normalizeNumber(campoQuantidade.value);
-    const valorUnitario = normalizeNumber(campoValorUnitario.value);
+    const valorUnitarioCentavos = normalizeMoneyToCents(campoValorUnitario.value);
     const unidade = obterUnidadeFormulario();
     const categoria = obterCategoriaFormulario();
 
@@ -266,7 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    if (!Number.isFinite(valorUnitario) || valorUnitario < 0) {
+    if (!Number.isInteger(valorUnitarioCentavos) || valorUnitarioCentavos < 0) {
       exibirMensagem("Informe um valor unitário válido.", "warning");
       campoValorUnitario.focus();
       return;
@@ -280,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
       quantidade: quantidade,
       unidade: unidade,
       categoria: categoria,
-      valorUnitario: valorUnitario
+      valorUnitarioCentavos: valorUnitarioCentavos
     };
 
     try {
@@ -327,7 +327,7 @@ document.addEventListener("DOMContentLoaded", function () {
             nome: item.nome,
             quantidade: Number(item.quantidade),
             unidade: item.unidade,
-            valorUnitario: Number(item.valorUnitario),
+            valorUnitarioCentavos: Number(item.valorUnitarioCentavos),
             categoria: item.categoria
           };
         })
@@ -402,7 +402,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function criarLinhaTabela(item) {
-    const subtotal = Number(item.quantidade) * Number(item.valorUnitario);
+    const subtotal = Math.round(Number(item.quantidade) * Number(item.valorUnitarioCentavos || 0));
     const indiceReal = encontrarIndiceRealDoItem(item);
     let linha;
 
@@ -467,7 +467,7 @@ document.addEventListener("DOMContentLoaded", function () {
     linha.dataset.categoria = normalizeText(item.categoria);
     linha.dataset.quantidade = String(Number(item.quantidade) || 0);
     linha.dataset.unidade = normalizeText(item.unidade);
-    linha.dataset.valorUnitario = String(Number(item.valorUnitario) || 0);
+    linha.dataset.valorUnitarioCentavos = String(Number(item.valorUnitarioCentavos) || 0);
     linha.dataset.subtotal = String(subtotal);
 
     const celulaNome = linha.querySelector(".item-nome");
@@ -503,7 +503,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (celulaValorUnitario) {
-      celulaValorUnitario.textContent = formatCurrency(item.valorUnitario);
+      celulaValorUnitario.textContent = formatCurrency(item.valorUnitarioCentavos);
     }
 
     if (celulaSubtotal) {
@@ -536,7 +536,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     campoItem.value = item.nome;
     campoQuantidade.value = formatFieldValue(item.quantidade);
-    campoValorUnitario.value = formatFieldValue(item.valorUnitario);
+    campoValorUnitario.value = formatFieldValueFromCents(item.valorUnitarioCentavos);
 
     preencherCampoUnidade(item.unidade);
     preencherCampoCategoria(item.categoria);
@@ -601,7 +601,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const total = itensCompra.reduce(function (acumulado, item) {
-      return acumulado + Number(item.quantidade) * Number(item.valorUnitario);
+      return acumulado + Math.round(Number(item.quantidade) * Number(item.valorUnitarioCentavos || 0));
     }, 0);
 
     totalCompraElement.textContent = formatCurrency(total);
@@ -993,7 +993,7 @@ document.addEventListener("DOMContentLoaded", function () {
         normalizeText(itemOriginal.unidade) === normalizeText(itemOrdenado.unidade) &&
         normalizeText(itemOriginal.categoria) === normalizeText(itemOrdenado.categoria) &&
         Number(itemOriginal.quantidade) === Number(itemOrdenado.quantidade) &&
-        Number(itemOriginal.valorUnitario) === Number(itemOrdenado.valorUnitario)
+        Number(itemOriginal.valorUnitarioCentavos) === Number(itemOrdenado.valorUnitarioCentavos)
       );
     });
   }
@@ -1028,64 +1028,19 @@ document.addEventListener("DOMContentLoaded", function () {
     return [];
   }
 
-  function normalizeNumber(valor) {
-    const texto = String(valor || "")
-      .trim()
-      .replace(/\s+/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".");
+  function normalizarItemCompra(valor) {
+    const valorUnitarioCentavos = Number.isInteger(Number(valor?.valorUnitarioCentavos))
+      ? Number(valor.valorUnitarioCentavos)
+      : decimalStringToCents(valor?.valorUnitario);
 
-    return parseFloat(texto);
+    return {
+      ...valor,
+      valorUnitarioCentavos: Number.isInteger(valorUnitarioCentavos) ? valorUnitarioCentavos : 0
+    };
   }
 
-  function normalizeText(valor) {
-    return String(valor || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  }
 
-  function normalizeCategoryName(valor) {
-    return String(valor || "").trim().replace(/\s+/g, " ");
-  }
 
-  function compareText(a, b) {
-    return String(a || "").localeCompare(String(b || ""), "pt-BR", {
-      sensitivity: "base"
-    });
-  }
-
-  function compareNumber(a, b) {
-    return Number(a || 0) - Number(b || 0);
-  }
-
-  function formatNumber(valor) {
-    return Number(valor || 0).toLocaleString("pt-BR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-  }
-
-  function formatCurrency(valor) {
-    return Number(valor || 0).toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    });
-  }
-
-  function formatFieldValue(valor) {
-    const numero = Number(valor);
-
-    if (!Number.isFinite(numero)) {
-      return "";
-    }
-
-    return numero.toLocaleString("pt-BR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
-  }
 
   function exibirMensagem(mensagem, tipo) {
     setFeedbackMessage(campoMensagem, mensagem, tipo);

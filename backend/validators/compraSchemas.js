@@ -2,7 +2,7 @@
  * Este arquivo reúne schemas das rotas de compras.
  * Ele existe para padronizar a entrada dos itens comprados.
  */
-const { z, quantidadePositivaSchema, valorNaoNegativoSchema } = require("./commonSchemas");
+const { z, quantidadePositivaSchema, valorCentavosNaoNegativoSchema } = require("./commonSchemas");
 
 const compraItemSchema = z.object({
   itemId: z.union([z.coerce.number().int().positive(), z.null()]).optional(),
@@ -10,7 +10,7 @@ const compraItemSchema = z.object({
   unidade: z.string().trim().min(1, "unidade inválida no item"),
   categoria: z.string().trim().min(1, "categoria inválida no item"),
   quantidade: quantidadePositivaSchema,
-  valorUnitario: valorNaoNegativoSchema,
+  valorUnitarioCentavos: valorCentavosNaoNegativoSchema,
 });
 
 const compraBodySchema = z.object({

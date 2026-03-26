@@ -1,7 +1,8 @@
 /**
  * Este arquivo guarda utilitários de normalização e conversão.
- * Ele existe para padronizar texto, números, e respostas derivadas das entidades do sistema.
+ * Ele existe para padronizar texto, números, dinheiro e respostas derivadas das entidades do sistema.
  */
+const { decimalValueToCents, decimalValueToString } = require("./money");
 function converterBoolean(valor) {
   if (typeof valor === "boolean") {
     return valor;
@@ -105,10 +106,19 @@ function decimalParaNumero(valor) {
 }
 
 function normalizarCompraItemResposta(compraItem) {
+  const valorUnitario = decimalValueToString(compraItem.valorUnitario);
+  const valorUnitarioCentavos = decimalValueToCents(compraItem.valorUnitario);
+  const quantidade = decimalParaNumero(compraItem.quantidade);
+  const subtotalCentavos = valorUnitarioCentavos === null || quantidade === null
+    ? null
+    : Math.round(quantidade * valorUnitarioCentavos);
+
   return {
     ...compraItem,
-    quantidade: decimalParaNumero(compraItem.quantidade),
-    valorUnitario: decimalParaNumero(compraItem.valorUnitario),
+    quantidade: quantidade,
+    valorUnitario: valorUnitario,
+    valorUnitarioCentavos: valorUnitarioCentavos,
+    subtotalCentavos: subtotalCentavos,
   };
 }
 
