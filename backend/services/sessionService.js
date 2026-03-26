@@ -33,7 +33,6 @@ function createSessionService(prisma) {
         nome: true,
         sobrenome: true,
         email: true,
-        grupoAtivoId: true,
         ativo: true,
         desativadoEm: true,
         excluidoEm: true,
@@ -87,12 +86,7 @@ function createSessionService(prisma) {
 
     let vinculoAtivo = null;
 
-    if (usuario.grupoAtivoId) {
-      vinculoAtivo =
-        vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === Number(usuario.grupoAtivoId)) || null;
-    }
-
-    if (!vinculoAtivo && vinculosAceitos.length === 1) {
+    if (vinculosAceitos.length === 1) {
       vinculoAtivo = vinculosAceitos[0];
     }
 
