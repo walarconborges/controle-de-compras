@@ -2,6 +2,17 @@
  * Este arquivo guarda a lógica de montagem e atualização da sessão do usuário.
  * Ele existe para separar conta global, vínculos por grupo e grupo ativo escolhido.
  */
+
+const STATUS_VINCULO_RELEVANTES = new Set([
+  "pendente",
+  "convidado",
+  "aceito",
+  "recusado",
+  "removido",
+  "saiu",
+  "cancelado",
+]);
+
 function montarNomeCompleto(nome, sobrenome) {
   return [String(nome || "").trim(), String(sobrenome || "").trim()]
     .filter(Boolean)
@@ -18,7 +29,24 @@ function normalizarUsuarioResposta(usuario) {
   };
 }
 
+function mapearVinculo(vinculo) {
+  return {
+    id: vinculo.id,
+    grupoId: vinculo.grupoId,
+    grupoNome: vinculo.grupo?.nome || null,
+    grupoCodigo: vinculo.grupo?.codigo || null,
+    papel: vinculo.papel || null,
+    status: vinculo.status || null,
+    solicitadoEm: vinculo.solicitadoEm || null,
+    aprovadoEm: vinculo.aprovadoEm || null,
+  };
+}
+
 function createSessionService(prisma) {
+  if (!prisma?.usuario) {
+    throw new Error("Prisma inválido ao criar sessionService.");
+  }
+
   async function montarSessaoUsuarioPorUsuarioId(usuarioId) {
     const usuarioNumero = Number(usuarioId);
 
@@ -69,16 +97,16 @@ function createSessionService(prisma) {
       return null;
     }
 
-    const adminSistema = false;
     const vinculosRelevantes = (usuario.usuariosGrupos || []).filter((vinculo) =>
-      ["pendente", "convidado", "aceito", "recusado", "removido", "saiu", "cancelado"].includes(vinculo.status)
+      STATUS_VINCULO_RELEVANTES.has(vinculo.status)
     );
 
     const vinculosAceitos = vinculosRelevantes.filter(
       (vinculo) =>
         vinculo.status === "aceito" &&
-        !vinculo.grupo?.excluidoEm &&
-        !vinculo.grupo?.desativadoEm
+        vinculo.grupo &&
+        !vinculo.grupo.excluidoEm &&
+        !vinculo.grupo.desativadoEm
     );
 
     let vinculoAtivo = null;
@@ -88,13 +116,14 @@ function createSessionService(prisma) {
     }
 
     const contextoPrimario = vinculoAtivo || vinculosRelevantes[0] || null;
+    const adminSistema = false;
 
     return {
       id: usuario.id,
-      nome: usuario.nome,
+      nome: usuario.nome || "",
       sobrenome: usuario.sobrenome || "",
       nomeCompleto: montarNomeCompleto(usuario.nome, usuario.sobrenome),
-      email: usuario.email,
+      email: usuario.email || "",
       papelGlobal: "usuario",
       adminSistema,
       ativo: Boolean(usuario.ativo),
@@ -109,20 +138,15 @@ function createSessionService(prisma) {
       quantidadeVinculosRelevantes: vinculosRelevantes.length,
       precisaSelecionarGrupo: !vinculoAtivo && vinculosAceitos.length > 1,
       podeAcessarPainelSistema: adminSistema,
-      vinculos: vinculosRelevantes.map((vinculo) => ({
-        id: vinculo.id,
-        grupoId: vinculo.grupoId,
-        grupoNome: vinculo.grupo?.nome || null,
-        grupoCodigo: vinculo.grupo?.codigo || null,
-        papel: vinculo.papel,
-        status: vinculo.status,
-        solicitadoEm: vinculo.solicitadoEm,
-        aprovadoEm: vinculo.aprovadoEm,
-      })),
+      vinculos: vinculosRelevantes.map(mapearVinculo),
     };
   }
 
   async function atualizarSessaoUsuario(req, usuarioId) {
+    if (!req?.session) {
+      throw new Error("Sessão não disponível para atualização.");
+    }
+
     const sessaoUsuario = await montarSessaoUsuarioPorUsuarioId(usuarioId);
 
     if (!sessaoUsuario) {
