@@ -1,12 +1,14 @@
 /**
- * Este arquivo registra rotas de usuários do grupo sem destruir a conta global por engano.
- * Admin de grupo pode gerenciar vínculos locais, mas não pode editar dados da conta global.
+ * Este arquivo registra rotas de usuários do grupo.
+ * Ele existe para concentrar listagem, leitura, criação, atualização e exclusão de usuários.
  */
 const validateSchema = require("../middlewares/validateSchema");
 const { anexarContextoErro } = require("../utils/errorUtils");
+const { registrarAuditoria } = require("../utils/audit");
 const {
   usuarioIdParamSchema,
   usuarioCreateBodySchema,
+  usuarioUpdateBodySchema,
 } = require("../validators/usuarioSchemas");
 
 module.exports = function registerUsuarioRoutes(app, deps) {
@@ -14,7 +16,6 @@ module.exports = function registerUsuarioRoutes(app, deps) {
     prisma,
     exigirAutenticacao,
     exigirPapel,
-    exigirGrupoAtivoAceito,
     obterGrupoIdSessao,
     normalizarUsuarioResposta,
     normalizarTextoSimples,
@@ -22,16 +23,17 @@ module.exports = function registerUsuarioRoutes(app, deps) {
     bcrypt,
   } = deps;
 
-  app.get("/usuarios", exigirAutenticacao, exigirGrupoAtivoAceito, exigirPapel("adminGrupo"), async (req, res, next) => {
+  app.get("/usuarios", exigirAutenticacao, exigirPapel("admin"), async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
       const vinculos = await prisma.usuarioGrupo.findMany({
         where: {
           grupoId,
-          excluidoEm: null,
         },
-        orderBy: { id: "asc" },
+        orderBy: {
+          id: "asc",
+        },
         include: {
           usuario: {
             select: {
@@ -40,8 +42,6 @@ module.exports = function registerUsuarioRoutes(app, deps) {
               sobrenome: true,
               email: true,
               ativo: true,
-              desativadoEm: true,
-              excluidoEm: true,
               criadoEm: true,
               atualizadoEm: true,
             },
@@ -52,94 +52,147 @@ module.exports = function registerUsuarioRoutes(app, deps) {
       res.json(
         vinculos
           .filter((vinculo) => vinculo.usuario)
-          .map((vinculo) => ({
-            ...normalizarUsuarioResposta(vinculo.usuario),
-            papel: vinculo.papel,
-            status: vinculo.status,
-          }))
+          .map((vinculo) => normalizarUsuarioResposta(vinculo.usuario))
       );
     } catch (error) {
       return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar usuários" }));
     }
   });
 
-  app.get(
-    "/usuarios/:id",
-    exigirAutenticacao,
-    exigirGrupoAtivoAceito,
-    exigirPapel("adminGrupo"),
-    validateSchema({ params: usuarioIdParamSchema }),
-    async (req, res, next) => {
-      try {
-        const id = Number(req.params.id);
-        const grupoId = obterGrupoIdSessao(req);
+  app.get("/usuarios/:id", exigirAutenticacao, exigirPapel("admin"), validateSchema({ params: usuarioIdParamSchema }), async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const grupoId = obterGrupoIdSessao(req);
 
-        const vinculo = await prisma.usuarioGrupo.findFirst({
-          where: { grupoId, usuarioId: id, excluidoEm: null },
-          include: {
-            usuario: {
-              select: {
-                id: true,
-                nome: true,
-                sobrenome: true,
-                email: true,
-                ativo: true,
-                desativadoEm: true,
-                excluidoEm: true,
-                criadoEm: true,
-                atualizadoEm: true,
-              },
+      const vinculo = await prisma.usuarioGrupo.findFirst({
+        where: {
+          grupoId,
+          usuarioId: id,
+        },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nome: true,
+              sobrenome: true,
+              email: true,
+              ativo: true,
+              criadoEm: true,
+              atualizadoEm: true,
             },
           },
-        });
+        },
+      });
 
-        if (!vinculo || !vinculo.usuario) {
-          return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
-        }
-
-        res.json({
-          ...normalizarUsuarioResposta(vinculo.usuario),
-          papel: vinculo.papel,
-          status: vinculo.status,
-        });
-      } catch (error) {
-        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar usuário" }));
+      if (!vinculo || !vinculo.usuario) {
+        return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
       }
-    }
-  );
 
-  app.post(
-    "/usuarios",
+      res.json(normalizarUsuarioResposta(vinculo.usuario));
+    } catch (error) {
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar usuário" }));
+    }
+  });
+
+  app.post("/usuarios", exigirAutenticacao, exigirPapel("admin"), validateSchema({ body: usuarioCreateBodySchema }), async (req, res, next) => {
+    try {
+      const grupoId = obterGrupoIdSessao(req);
+      const nome = normalizarTextoSimples(req.body.nome);
+      const sobrenome = normalizarTextoSimples(req.body.sobrenome);
+      const email = normalizarEmail(req.body.email);
+      const senha = normalizarTextoSimples(req.body.senha);
+      const ativo = req.body.ativo;
+
+      const senhaHash = await bcrypt.hash(senha, 10);
+
+      const usuario = await prisma.usuario.create({
+        data: {
+          nome,
+          sobrenome,
+          email,
+          senhaHash,
+          ativo: typeof ativo === "boolean" ? ativo : true,
+          usuariosGrupos: {
+            create: {
+              grupoId,
+              papel: "membro",
+              status: "aceito",
+              aprovadoEm: new Date(),
+              aprovadoPorEmail: req.session.usuario.email,
+            },
+          },
+        },
+        select: {
+          id: true,
+          nome: true,
+          sobrenome: true,
+          email: true,
+          ativo: true,
+          criadoEm: true,
+          atualizadoEm: true,
+        },
+      });
+
+      await registrarAuditoria(prisma, req, {
+        entidade: "usuario",
+        entidadeId: usuario.id,
+        acao: "criacao_usuario_aprovado",
+        descricao: `Usuário ${usuario.email} criado administrativamente`,
+        metadados: { aprovadoPorEmail: req.session.usuario.email },
+      });
+
+      res.status(201).json(normalizarUsuarioResposta(usuario));
+    } catch (error) {
+      
+
+      if (error.code === "P2002") {
+        return res.status(409).json({ erro: "Nome ou email já cadastrado" });
+      }
+
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao criar usuário" }));
+    }
+  });
+
+  app.put(
+    "/usuarios/:id",
     exigirAutenticacao,
-    exigirGrupoAtivoAceito,
-    exigirPapel("adminGrupo"),
-    validateSchema({ body: usuarioCreateBodySchema }),
+    exigirPapel("admin"),
+    validateSchema({ params: usuarioIdParamSchema, body: usuarioUpdateBodySchema }),
     async (req, res, next) => {
       try {
+        const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
         const nome = normalizarTextoSimples(req.body.nome);
         const sobrenome = normalizarTextoSimples(req.body.sobrenome);
         const email = normalizarEmail(req.body.email);
         const senha = normalizarTextoSimples(req.body.senha);
-        const senhaHash = await bcrypt.hash(senha, 10);
+        const ativo = req.body.ativo;
 
-        const usuario = await prisma.usuario.create({
-          data: {
-            nome,
-            sobrenome,
-            email,
-            senhaHash,
-            papelGlobal: "usuario",
-            usuariosGrupos: {
-              create: {
-                grupoId,
-                papel: "membro",
-                status: "aceito",
-                aprovadoEm: new Date(),
-              },
-            },
-            grupoAtivoId: grupoId,
+        const vinculo = await prisma.usuarioGrupo.findFirst({
+          where: {
+            grupoId,
+            usuarioId: id,
           },
+        });
+
+        if (!vinculo) {
+          return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
+        }
+
+        const dadosAtualizacao = {
+          nome,
+          sobrenome,
+          email,
+          ativo: typeof ativo === "boolean" ? ativo : true,
+        };
+
+        if (senha) {
+          dadosAtualizacao.senhaHash = await bcrypt.hash(senha, 10);
+        }
+
+        const usuario = await prisma.usuario.update({
+          where: { id },
+          data: dadosAtualizacao,
           select: {
             id: true,
             nome: true,
@@ -151,61 +204,57 @@ module.exports = function registerUsuarioRoutes(app, deps) {
           },
         });
 
-        res.status(201).json(normalizarUsuarioResposta(usuario));
+        res.json(normalizarUsuarioResposta(usuario));
       } catch (error) {
-        if (error.code === "P2002") {
-          return res.status(409).json({ erro: "Email já cadastrado" });
+        
+
+        if (error.code === "P2025") {
+          return res.status(404).json({ erro: "Usuário não encontrado" });
         }
 
-        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao criar usuário" }));
-      }
-    }
-  );
+        if (error.code === "P2002") {
+          return res.status(409).json({ erro: "Nome ou email já cadastrado" });
+        }
 
-  app.put(
-    "/usuarios/:id",
-    exigirAutenticacao,
-    exigirGrupoAtivoAceito,
-    exigirPapel("adminGrupo"),
-    validateSchema({ params: usuarioIdParamSchema }),
-    async (req, res) => {
-      return res.status(403).json({
-        erro: "Admin do grupo não pode editar a conta global do usuário. Use /meu-perfil para a própria conta, /painel-sistema/usuarios/:id para administração global e as rotas do grupo para alterar vínculo, papel ou status.",
-      });
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar usuário" }));
+      }
     }
   );
 
   app.delete(
     "/usuarios/:id",
     exigirAutenticacao,
-    exigirGrupoAtivoAceito,
-    exigirPapel("adminGrupo"),
+    exigirPapel("admin"),
     validateSchema({ params: usuarioIdParamSchema }),
     async (req, res, next) => {
       try {
-        const id = Number(req.params.id);
+        const { id } = req.params;
         const grupoId = obterGrupoIdSessao(req);
 
         const vinculo = await prisma.usuarioGrupo.findFirst({
-          where: { grupoId, usuarioId: id, excluidoEm: null },
+          where: {
+            grupoId,
+            usuarioId: id,
+          },
         });
 
         if (!vinculo) {
           return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
         }
 
-        await prisma.usuarioGrupo.update({
-          where: { id: vinculo.id },
-          data: {
-            status: "removido",
-            removidoEm: new Date(),
-            excluidoEm: new Date(),
-          },
+        await prisma.usuario.delete({
+          where: { id },
         });
 
-        res.json({ mensagem: "Vínculo do usuário removido logicamente do grupo com sucesso" });
+        res.json({ mensagem: "Usuário excluído com sucesso" });
       } catch (error) {
-        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao remover usuário do grupo" }));
+        
+
+        if (error.code === "P2025") {
+          return res.status(404).json({ erro: "Usuário não encontrado" });
+        }
+
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir usuário" }));
       }
     }
   );
