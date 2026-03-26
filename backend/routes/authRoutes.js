@@ -3,6 +3,7 @@
  * Ele existe para concentrar fluxos de entrada do usuário e atualização da sessão autenticada.
  */
 const validateSchema = require("../middlewares/validateSchema");
+const { loginRateLimit, cadastroRateLimit } = require("../middlewares/rateLimitMiddleware");
 const { anexarContextoErro } = require("../utils/errorUtils");
 const {
   sugestoesGrupoQuerySchema,
@@ -59,7 +60,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     }
   });
 
-  app.post("/cadastro", validateSchema({ body: cadastroBodySchema }), async (req, res, next) => {
+  app.post("/cadastro", cadastroRateLimit, validateSchema({ body: cadastroBodySchema }), async (req, res, next) => {
     try {
       const nome = normalizarTextoSimples(req.body.nome);
       const sobrenome = normalizarTextoSimples(req.body.sobrenome);
@@ -158,7 +159,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     }
   });
 
-  app.post("/login", validateSchema({ body: loginBodySchema }), async (req, res, next) => {
+  app.post("/login", loginRateLimit, validateSchema({ body: loginBodySchema }), async (req, res, next) => {
     try {
       const email = normalizarEmail(req.body.email);
       const senha = normalizarTextoSimples(req.body.senha);
