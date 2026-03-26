@@ -12,24 +12,93 @@
     <header class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
       <div>
         <h1 class="h3 mb-1">Perfil</h1>
-        <p class="text-muted mb-0">Dados do usuário e gestão do grupo.</p>
+        <p class="text-muted mb-0">Conta global, vínculos por grupo e grupo ativo.</p>
       </div>
-      <div class="d-flex gap-2">
-        <a href="homepage.html" class="btn btn-outline-secondary">Voltar</a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="homepage.html" class="btn btn-outline-secondary">Início</a>
+        <a href="painel-sistema.html" class="btn btn-outline-dark" id="link-painel-sistema" hidden>Painel do Sistema</a>
         <button type="button" class="btn btn-outline-danger" id="btn-logout">Sair</button>
       </div>
     </header>
 
     <section class="card mb-4">
       <div class="card-body">
-        <h2 class="h5 mb-3">Dados do usuário</h2>
-        <div id="perfil-dados" class="small text-muted">Carregando...</div>
+        <h2 class="h5 mb-3">Dados da conta</h2>
+        <div id="perfil-dados" class="small text-muted mb-3">Carregando...</div>
+
+        <form id="perfil-form" class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label" for="perfil-nome">Nome</label>
+            <input class="form-control" id="perfil-nome" type="text">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="perfil-sobrenome">Sobrenome</label>
+            <input class="form-control" id="perfil-sobrenome" type="text">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="perfil-email">E-mail</label>
+            <input class="form-control" id="perfil-email" type="email">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="perfil-senha">Nova senha</label>
+            <input class="form-control" id="perfil-senha" type="password" placeholder="Opcional">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" type="submit">Salvar perfil</button>
+          </div>
+        </form>
       </div>
     </section>
 
     <section class="card mb-4">
       <div class="card-body">
-        <h2 class="h5 mb-3">Membros do grupo</h2>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+          <h2 class="h5 mb-0">Vínculos com grupos</h2>
+          <span class="small text-muted">Apenas vínculos aceitos podem virar grupo ativo.</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Grupo</th>
+                <th>Código</th>
+                <th>Papel</th>
+                <th>Status</th>
+                <th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="perfil-vinculos"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+          <h2 class="h5 mb-0">Membros do grupo ativo</h2>
+          <span class="small text-muted" id="perfil-admin-aviso"></span>
+        </div>
+
+        <form id="convite-form" class="row g-3 mb-3" hidden>
+          <div class="col-md-5">
+            <input class="form-control" id="convite-email" type="email" placeholder="E-mail do usuário existente">
+          </div>
+          <div class="col-md-3">
+            <select class="form-select" id="convite-papel">
+              <option value="membro">membro</option>
+              <option value="adminGrupo">adminGrupo</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-outline-primary" type="submit">Convidar usuário existente</button>
+          </div>
+        </form>
+
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn btn-outline-warning" id="btn-sair-grupo" type="button">Sair do grupo ativo</button>
+        </div>
+
         <div class="table-responsive">
           <table class="table align-middle mb-0">
             <thead>
@@ -38,6 +107,7 @@
                 <th>E-mail</th>
                 <th>Papel</th>
                 <th>Status</th>
+                <th class="text-end">Ações</th>
               </tr>
             </thead>
             <tbody id="perfil-membros"></tbody>
@@ -49,8 +119,8 @@
     <section class="card">
       <div class="card-body">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
-          <h2 class="h5 mb-0">Solicitações pendentes</h2>
-          <span class="small text-muted" id="perfil-admin-aviso"></span>
+          <h2 class="h5 mb-0">Pendências do grupo ativo</h2>
+          <span class="small text-muted">Solicitações e convites.</span>
         </div>
         <div class="table-responsive">
           <table class="table align-middle mb-0">

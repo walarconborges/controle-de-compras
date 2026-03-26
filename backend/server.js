@@ -1,7 +1,5 @@
 /**
- * Este arquivo inicia o servidor Express, configura CORS, JSON, sessão persistente em PostgreSQL,
- * Prisma, arquivos estáticos e registra as rotas separadas por domínio.
- * Ele existe para bootstrap da aplicação. A regra de negócio e as rotas ficaram fora daqui.
+ * Bootstrap do servidor Express.
  */
 require("dotenv").config({ path: "../.env" });
 
@@ -14,7 +12,14 @@ const session = require("express-session");
 const connectPgSimple = require("connect-pg-simple");
 const { Pool } = require("pg");
 
-const { exigirAutenticacao, exigirPapel, obterGrupoIdSessao, idsSaoIguais } = require("./middlewares/authMiddleware");
+const {
+  exigirAutenticacao,
+  exigirPapel,
+  exigirAdminSistema,
+  exigirGrupoAtivoAceito,
+  obterGrupoIdSessao,
+  idsSaoIguais,
+} = require("./middlewares/authMiddleware");
 const {
   converterBoolean,
   normalizarDecimal,
@@ -29,6 +34,7 @@ const {
   normalizarCompraResposta,
 } = require("./utils/normalizers");
 const { createSessionService } = require("./services/sessionService");
+const { criarMiddlewareAuditoria } = require("./utils/audit");
 
 const registerDiagnosticRoutes = require("./routes/diagnosticRoutes");
 const registerCategoriaItemRoutes = require("./routes/categoriaItemRoutes");
@@ -47,13 +53,8 @@ app.set("trust proxy", 1);
 const DATABASE_URL = process.env.DATABASE_URL;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 
-if (!DATABASE_URL) {
-  throw new Error("A variável de ambiente DATABASE_URL é obrigatória.");
-}
-
-if (!SESSION_SECRET) {
-  throw new Error("A variável de ambiente SESSION_SECRET é obrigatória.");
-}
+if (!DATABASE_URL) throw new Error("A variável de ambiente DATABASE_URL é obrigatória.");
+if (!SESSION_SECRET) throw new Error("A variável de ambiente SESSION_SECRET é obrigatória.");
 
 const PUBLIC_PATH = path.resolve(__dirname, "../public");
 const PgSession = connectPgSimple(session);
@@ -84,14 +85,9 @@ const ORIGENS_PERMITIDAS = [
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin) {
+      if (!origin || ORIGENS_PERMITIDAS.includes(origin)) {
         return callback(null, true);
       }
-
-      if (ORIGENS_PERMITIDAS.includes(origin)) {
-        return callback(null, true);
-      }
-
       return callback(new Error("Origem não permitida pelo CORS"));
     },
     credentials: true,
@@ -119,6 +115,8 @@ app.use(
   })
 );
 
+app.use(criarMiddlewareAuditoria(prisma));
+
 const sessionService = createSessionService(prisma);
 
 const deps = {
@@ -128,6 +126,8 @@ const deps = {
   PUBLIC_PATH,
   exigirAutenticacao,
   exigirPapel,
+  exigirAdminSistema,
+  exigirGrupoAtivoAceito,
   obterGrupoIdSessao,
   idsSaoIguais,
   converterBoolean,

@@ -1,9 +1,16 @@
-// Utilitários de autenticação e sessão: validam acesso, redirecionam conforme status do grupo e executam logout.
 import { apiGet, apiPost } from "./api.js";
 import { PAGE_URLS } from "./constants.js";
 
 function redirecionar(destino) {
   window.location.replace(destino);
+}
+
+function resolverDestinoPorSessao(usuario) {
+  if (!usuario) return PAGE_URLS.login;
+  if (usuario.adminSistema && !usuario.temGrupoAceito) return PAGE_URLS.profile;
+  if (usuario.precisaSelecionarGrupo) return PAGE_URLS.profile;
+  if (usuario.temGrupoAceito && usuario.grupoId) return PAGE_URLS.home;
+  return PAGE_URLS.pending;
 }
 
 export async function getSession() {
@@ -18,11 +25,8 @@ export async function getSession() {
 export async function redirectIfSessionExists() {
   try {
     const { response, usuario } = await getSession();
-    if (!response.ok || !usuario) {
-      return null;
-    }
-
-    redirecionar(String(usuario.statusGrupo || "").toLowerCase() === "aceito" ? PAGE_URLS.home : PAGE_URLS.pending);
+    if (!response.ok || !usuario) return null;
+    redirecionar(resolverDestinoPorSessao(usuario));
     return usuario;
   } catch {
     return null;
@@ -37,10 +41,9 @@ export async function ensureAcceptedSession() {
     throw new Error("Sessão não encontrada");
   }
 
-  const statusGrupo = String(usuario.statusGrupo || "").toLowerCase();
-  if (statusGrupo && statusGrupo !== "aceito") {
-    redirecionar(PAGE_URLS.pending);
-    throw new Error("Usuário ainda não foi aceito no grupo");
+  if (!usuario.temGrupoAceito || !usuario.grupoId) {
+    redirecionar(usuario.adminSistema ? PAGE_URLS.profile : PAGE_URLS.pending);
+    throw new Error("Usuário sem grupo ativo aceito");
   }
 
   return usuario;
@@ -52,6 +55,22 @@ export async function ensureAnySession() {
   if (!response.ok || !usuario) {
     redirecionar(PAGE_URLS.login);
     throw new Error("Sessão não encontrada");
+  }
+
+  return usuario;
+}
+
+export async function ensureAdminSistemaSession() {
+  const { response, usuario } = await getSession();
+
+  if (!response.ok || !usuario) {
+    redirecionar(PAGE_URLS.login);
+    throw new Error("Sessão não encontrada");
+  }
+
+  if (!usuario.adminSistema) {
+    redirecionar(PAGE_URLS.profile);
+    throw new Error("Acesso restrito ao administrador do sistema");
   }
 
   return usuario;

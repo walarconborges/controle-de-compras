@@ -169,9 +169,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
       exibirMensagemLogin("Login realizado com sucesso. Redirecionando...", "success");
 
-      const destino = dados.usuario && dados.usuario.statusGrupo === "aceito"
-        ? "homepage.html"
-        : "aguardando.html";
+      const usuario = dados.usuario || null;
+      const destino = usuario?.precisaSelecionarGrupo
+        ? "perfil.html"
+        : usuario?.temGrupoAceito && usuario?.grupoId
+          ? "homepage.html"
+          : "aguardando.html";
 
       setTimeout(function () {
         window.location.replace(destino);
@@ -195,10 +198,10 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      const statusGrupo = dados.usuario && dados.usuario.statusGrupo ? dados.usuario.statusGrupo : "pendente";
-      const mensagem = statusGrupo === "aceito"
+      const usuario = dados.usuario || null;
+      const mensagem = usuario?.temGrupoAceito
         ? "Conta criada com sucesso. Redirecionando..."
-        : "Conta criada. Agora aguarde a aprovação do administrador do grupo.";
+        : "Conta criada. Agora aguarde aprovação ou aceite um convite.";
 
       exibirMensagemCadastro(mensagem, "success");
 
@@ -206,7 +209,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (cadastroModal) {
           cadastroModal.hide();
         }
-        window.location.replace(statusGrupo === "aceito" ? "homepage.html" : "aguardando.html");
+        if (usuario?.precisaSelecionarGrupo) {
+          window.location.replace("perfil.html");
+        } else {
+          window.location.replace(usuario?.temGrupoAceito && usuario?.grupoId ? "homepage.html" : "aguardando.html");
+        }
       }, 500);
     } catch (error) {
       console.error("Erro ao processar cadastro:", error);

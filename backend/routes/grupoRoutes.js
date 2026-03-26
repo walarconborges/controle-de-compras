@@ -1,22 +1,33 @@
 /**
- * Este arquivo registra rotas de grupos.
- * Ele existe para concentrar criação, leitura, atualização e exclusão dos grupos do sistema.
+ * Este arquivo registra rotas de grupos com exclusão lógica.
  */
 const validateSchema = require("../middlewares/validateSchema");
 const { grupoIdParamSchema, grupoBodySchema } = require("../validators/grupoSchemas");
 const { anexarContextoErro } = require("../utils/errorUtils");
 
 module.exports = function registerGrupoRoutes(app, deps) {
-  const { prisma, exigirAutenticacao, exigirPapel, obterGrupoIdSessao, idsSaoIguais, normalizarNomeGrupo, gerarCodigoGrupo } = deps;
+  const {
+    prisma,
+    exigirAutenticacao,
+    exigirPapel,
+    exigirAdminSistema,
+    exigirGrupoAtivoAceito,
+    obterGrupoIdSessao,
+    idsSaoIguais,
+    normalizarNomeGrupo,
+    gerarCodigoGrupo,
+  } = deps;
 
   app.get("/grupos", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoIdSessao(req);
 
-      const grupos = await prisma.grupo.findMany({
-        where: { id: grupoId },
-        orderBy: { id: "asc" },
-      });
+      const grupos = grupoId
+        ? await prisma.grupo.findMany({
+            where: { id: grupoId, excluidoEm: null },
+            orderBy: { id: "asc" },
+          })
+        : [];
 
       res.json(grupos);
     } catch (error) {
@@ -26,15 +37,15 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
   app.get("/grupos/:id", exigirAutenticacao, validateSchema({ params: grupoIdParamSchema }), async (req, res, next) => {
     try {
-      const { id } = req.params;
+      const id = Number(req.params.id);
       const grupoIdSessao = obterGrupoIdSessao(req);
 
-      if (!idsSaoIguais(id, grupoIdSessao)) {
+      if (!idsSaoIguais(id, grupoIdSessao) && !req.session.usuario?.adminSistema) {
         return res.status(403).json({ erro: "Acesso negado a outro grupo" });
       }
 
-      const grupo = await prisma.grupo.findUnique({
-        where: { id },
+      const grupo = await prisma.grupo.findFirst({
+        where: { id, excluidoEm: null },
       });
 
       if (!grupo) {
@@ -47,7 +58,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
     }
   });
 
-  app.post("/grupos", exigirAutenticacao, exigirPapel("admin"), validateSchema({ body: grupoBodySchema }), async (req, res, next) => {
+  app.post("/grupos", exigirAutenticacao, exigirAdminSistema, validateSchema({ body: grupoBodySchema }), async (req, res, next) => {
     try {
       const nome = normalizarNomeGrupo(req.body.nome);
 
@@ -62,8 +73,6 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
       res.status(201).json(grupo);
     } catch (error) {
-      
-
       if (error.code === "P2002") {
         return res.status(409).json({ erro: "Esse grupo já existe" });
       }
@@ -72,70 +81,53 @@ module.exports = function registerGrupoRoutes(app, deps) {
     }
   });
 
-  app.put(
-    "/grupos/:id",
-    exigirAutenticacao,
-    exigirPapel("admin"),
-    validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }),
-    async (req, res, next) => {
-      try {
-        const { id } = req.params;
-        const grupoIdSessao = obterGrupoIdSessao(req);
+  app.put("/grupos/:id", exigirAutenticacao, exigirGrupoAtivoAceito, exigirPapel("adminGrupo"), validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }), async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const grupoIdSessao = obterGrupoIdSessao(req);
 
-        if (!idsSaoIguais(id, grupoIdSessao)) {
-          return res.status(403).json({ erro: "Acesso negado a outro grupo" });
-        }
-
-        const grupo = await prisma.grupo.update({
-          where: { id },
-          data: { nome: normalizarNomeGrupo(req.body.nome) },
-        });
-
-        res.json(grupo);
-      } catch (error) {
-        
-
-        if (error.code === "P2025") {
-          return res.status(404).json({ erro: "Grupo não encontrado" });
-        }
-
-        if (error.code === "P2002") {
-          return res.status(409).json({ erro: "Esse grupo já existe" });
-        }
-
-        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar grupo" }));
+      if (!idsSaoIguais(id, grupoIdSessao) && !req.session.usuario?.adminSistema) {
+        return res.status(403).json({ erro: "Acesso negado a outro grupo" });
       }
-    }
-  );
 
-  app.delete(
-    "/grupos/:id",
-    exigirAutenticacao,
-    exigirPapel("admin"),
-    validateSchema({ params: grupoIdParamSchema }),
-    async (req, res, next) => {
-      try {
-        const { id } = req.params;
-        const grupoIdSessao = obterGrupoIdSessao(req);
+      const grupo = await prisma.grupo.update({
+        where: { id },
+        data: { nome: normalizarNomeGrupo(req.body.nome) },
+      });
 
-        if (!idsSaoIguais(id, grupoIdSessao)) {
-          return res.status(403).json({ erro: "Acesso negado a outro grupo" });
-        }
-
-        await prisma.grupo.delete({
-          where: { id },
-        });
-
-        res.json({ mensagem: "Grupo excluído com sucesso" });
-      } catch (error) {
-        
-
-        if (error.code === "P2025") {
-          return res.status(404).json({ erro: "Grupo não encontrado" });
-        }
-
-        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir grupo" }));
+      res.json(grupo);
+    } catch (error) {
+      if (error.code === "P2025") {
+        return res.status(404).json({ erro: "Grupo não encontrado" });
       }
+
+      if (error.code === "P2002") {
+        return res.status(409).json({ erro: "Esse grupo já existe" });
+      }
+
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar grupo" }));
     }
-  );
+  });
+
+  app.delete("/grupos/:id", exigirAutenticacao, exigirAdminSistema, validateSchema({ params: grupoIdParamSchema }), async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+
+      await prisma.grupo.update({
+        where: { id },
+        data: {
+          desativadoEm: new Date(),
+          excluidoEm: new Date(),
+        },
+      });
+
+      res.json({ mensagem: "Grupo excluído logicamente com sucesso" });
+    } catch (error) {
+      if (error.code === "P2025") {
+        return res.status(404).json({ erro: "Grupo não encontrado" });
+      }
+
+      return next(anexarContextoErro(error, req, { publicMessage: "Erro ao excluir grupo" }));
+    }
+  });
 };

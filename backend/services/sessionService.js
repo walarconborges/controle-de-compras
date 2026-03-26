@@ -1,6 +1,6 @@
 /**
  * Este arquivo guarda a lógica de montagem e atualização da sessão do usuário.
- * Ele existe para separar a regra de escolha do vínculo ativo da camada de rota.
+ * Ele existe para separar conta global, vínculos por grupo e grupo ativo escolhido.
  */
 function montarNomeCompleto(nome, sobrenome) {
   return [String(nome || "").trim(), String(sobrenome || "").trim()]
@@ -33,18 +33,36 @@ function createSessionService(prisma) {
         nome: true,
         sobrenome: true,
         email: true,
+        papelGlobal: true,
+        grupoAtivoId: true,
+        ativo: true,
+        desativadoEm: true,
+        excluidoEm: true,
         usuariosGrupos: {
+          where: {
+            excluidoEm: null,
+            grupo: {
+              excluidoEm: null,
+            },
+          },
+          orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
           select: {
             id: true,
             grupoId: true,
             papel: true,
             status: true,
-            aprovadoEm: true,
             solicitadoEm: true,
+            aprovadoEm: true,
+            removidoEm: true,
+            canceladoEm: true,
+            criadoEm: true,
             grupo: {
               select: {
+                id: true,
                 nome: true,
                 codigo: true,
+                desativadoEm: true,
+                excluidoEm: true,
               },
             },
           },
@@ -52,46 +70,33 @@ function createSessionService(prisma) {
       },
     });
 
-    if (!usuario || !usuario.usuariosGrupos.length) {
+    if (!usuario) {
       return null;
     }
 
-    const prioridadeStatus = {
-      aceito: 0,
-      pendente: 1,
-      recusado: 2,
-    };
+    const adminSistema = usuario.papelGlobal === "adminSistema";
+    const vinculosRelevantes = (usuario.usuariosGrupos || []).filter((vinculo) =>
+      ["pendente", "convidado", "aceito", "recusado", "removido", "saiu", "cancelado"].includes(vinculo.status)
+    );
 
-    const vinculosOrdenados = [...usuario.usuariosGrupos].sort((a, b) => {
-      const prioridadeA = prioridadeStatus[a.status] ?? 99;
-      const prioridadeB = prioridadeStatus[b.status] ?? 99;
+    const vinculosAceitos = vinculosRelevantes.filter(
+      (vinculo) =>
+        vinculo.status === "aceito" &&
+        !vinculo.grupo?.excluidoEm &&
+        !vinculo.grupo?.desativadoEm
+    );
 
-      if (prioridadeA !== prioridadeB) {
-        return prioridadeA - prioridadeB;
-      }
+    let vinculoAtivo = null;
 
-      const aprovadoATime = a.aprovadoEm ? new Date(a.aprovadoEm).getTime() : 0;
-      const aprovadoBTime = b.aprovadoEm ? new Date(b.aprovadoEm).getTime() : 0;
-
-      if (aprovadoATime !== aprovadoBTime) {
-        return aprovadoBTime - aprovadoATime;
-      }
-
-      const solicitadoATime = a.solicitadoEm ? new Date(a.solicitadoEm).getTime() : 0;
-      const solicitadoBTime = b.solicitadoEm ? new Date(b.solicitadoEm).getTime() : 0;
-
-      if (solicitadoATime !== solicitadoBTime) {
-        return solicitadoBTime - solicitadoATime;
-      }
-
-      return (b.id ?? 0) - (a.id ?? 0);
-    });
-
-    const vinculoAtivo = vinculosOrdenados[0];
-
-    if (!vinculoAtivo) {
-      return null;
+    if (usuario.grupoAtivoId) {
+      vinculoAtivo = vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === Number(usuario.grupoAtivoId)) || null;
     }
+
+    if (!vinculoAtivo && vinculosAceitos.length === 1) {
+      vinculoAtivo = vinculosAceitos[0];
+    }
+
+    const contextoPrimario = vinculoAtivo || vinculosRelevantes[0] || null;
 
     return {
       id: usuario.id,
@@ -99,11 +104,34 @@ function createSessionService(prisma) {
       sobrenome: usuario.sobrenome || "",
       nomeCompleto: montarNomeCompleto(usuario.nome, usuario.sobrenome),
       email: usuario.email,
-      grupoId: vinculoAtivo.grupoId,
-      grupoNome: vinculoAtivo.grupo?.nome || null,
-      grupoCodigo: vinculoAtivo.grupo?.codigo || null,
-      papel: vinculoAtivo.papel,
-      statusGrupo: vinculoAtivo.status,
+      papelGlobal: usuario.papelGlobal || "usuario",
+      adminSistema,
+      ativo: Boolean(usuario.ativo),
+      desativadoEm: usuario.desativadoEm,
+      excluidoEm: usuario.excluidoEm,
+      grupoId: vinculoAtivo?.grupoId || null,
+      grupoAtivoId: vinculoAtivo?.grupoId || null,
+      grupoNome: vinculoAtivo?.grupo?.nome || contextoPrimario?.grupo?.nome || null,
+      grupoCodigo: vinculoAtivo?.grupo?.codigo || contextoPrimario?.grupo?.codigo || null,
+      papel: vinculoAtivo?.papel || null,
+      statusGrupo: contextoPrimario?.status || null,
+      temGrupoAceito: vinculosAceitos.length > 0,
+      quantidadeGruposAceitos: vinculosAceitos.length,
+      quantidadeVinculosRelevantes: vinculosRelevantes.length,
+      precisaSelecionarGrupo: !vinculoAtivo && vinculosAceitos.length > 1,
+      podeAcessarPainelSistema: adminSistema,
+      vinculos: vinculosRelevantes.map((vinculo) => ({
+        id: vinculo.id,
+        grupoId: vinculo.grupoId,
+        grupoNome: vinculo.grupo?.nome || null,
+        grupoCodigo: vinculo.grupo?.codigo || null,
+        papel: vinculo.papel,
+        status: vinculo.status,
+        solicitadoEm: vinculo.solicitadoEm,
+        aprovadoEm: vinculo.aprovadoEm,
+        removidoEm: vinculo.removidoEm,
+        canceladoEm: vinculo.canceladoEm,
+      })),
     };
   }
 

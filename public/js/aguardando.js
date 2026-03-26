@@ -10,13 +10,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   verificarStatus();
 
-  if (btnAtualizar) {
-    btnAtualizar.addEventListener("click", verificarStatus);
-  }
-
-  if (btnSair) {
-    btnSair.addEventListener("click", logout);
-  }
+  if (btnAtualizar) btnAtualizar.addEventListener("click", verificarStatus);
+  if (btnSair) btnSair.addEventListener("click", logout);
 
   async function verificarStatus() {
     try {
@@ -29,16 +24,22 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       const usuario = dados.usuario || dados;
-      const status = String(usuario.statusGrupo || "").toLowerCase();
-      const grupoNome = usuario.grupoNome || "-";
-      const grupoCodigo = usuario.grupoCodigo || "-";
-      const papel = usuario.papel || "-";
+      const vinculos = Array.isArray(usuario.vinculos) ? usuario.vinculos : [];
+      const descricaoVinculos = vinculos.map((v) => `${v.grupoNome || "-"}: ${v.status}`).join(" | ") || "-";
 
       if (info) {
-        info.textContent = `Grupo: ${grupoNome} | Código: ${grupoCodigo} | Papel: ${papel} | Status: ${status || "-"}`;
+        info.textContent = `Vínculos: ${descricaoVinculos}`;
       }
 
-      if (status === "aceito") {
+      if (usuario.precisaSelecionarGrupo) {
+        exibirMensagem("Você possui mais de um grupo aceito. Escolha o grupo ativo no perfil.", "warning");
+        setTimeout(function () {
+          window.location.replace("perfil.html");
+        }, 600);
+        return;
+      }
+
+      if (usuario.temGrupoAceito && usuario.grupoId) {
         exibirMensagem("Acesso liberado. Redirecionando...", "success");
         setTimeout(function () {
           window.location.replace("homepage.html");
@@ -46,7 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      exibirMensagem("Seu acesso ainda está pendente.", "warning");
+      exibirMensagem("Seu acesso ainda está pendente ou aguardando ação em um convite.", "warning");
     } catch (error) {
       console.error("Erro ao verificar status:", error);
       exibirMensagem("Não foi possível verificar o status agora.", "danger");
@@ -58,10 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function exibirMensagem(texto, variante) {
-    if (!mensagem) {
-      return;
-    }
+    if (!mensagem) return;
     setFeedbackMessage(mensagem, texto, variante, { classeBase: "small mt-3" });
   }
-
 });

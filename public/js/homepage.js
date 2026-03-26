@@ -10,11 +10,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const btnLogout = document.getElementById("btn-logout");
   const usuarioLogado = document.getElementById("usuario-logado");
   const sessaoInfo = document.getElementById("sessao-info");
+  const linkPainelSistema = document.getElementById("link-painel-sistema");
 
-
-  if (!menu || !menuContent || !backdrop || !btnLogout || !usuarioLogado || !sessaoInfo) {
-    return;
-  }
+  if (!menu || !menuContent || !backdrop || !btnLogout || !usuarioLogado || !sessaoInfo) return;
 
   setupMobileMenu({
     menu,
@@ -25,7 +23,6 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   verificarSessao();
-
 
   btnLogout.addEventListener("click", async function () {
     try {
@@ -43,6 +40,10 @@ document.addEventListener("DOMContentLoaded", function () {
       const usuario = await ensureAcceptedSession();
       usuarioLogado.textContent = `${usuario.nome || "Usuário"} | ${usuario.email || "sem e-mail"}`;
       preencherSessaoInfo(usuario);
+
+      if (linkPainelSistema) {
+        linkPainelSistema.hidden = !usuario.adminSistema;
+      }
     } catch (error) {
       console.error("Erro ao verificar sessão:", error);
       window.location.replace("index.html");
@@ -51,17 +52,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function preencherSessaoInfo(usuario) {
     const campos = [
-      ["Usuário", usuario.nome || "Não informado"],
+      ["Usuário", usuario.nomeCompleto || usuario.nome || "Não informado"],
       ["E-mail", usuario.email || "Não informado"],
-      ["Grupo", usuario.grupoNome || "Não informado"],
+      ["Grupo ativo", usuario.grupoNome || "Não informado"],
       ["Código do grupo", usuario.grupoCodigo || "Não informado"],
       ["Grupo ID", usuario.grupoId ?? "Não informado"],
-      ["Papel", usuario.papel || "Não informado"],
-      ["Status no grupo", usuario.statusGrupo || "Não informado"],
+      ["Papel no grupo", usuario.papel || "Não informado"],
+      ["Papel global", usuario.papelGlobal || "usuario"],
+      ["Admin do sistema", usuario.adminSistema ? "Sim" : "Não"],
     ];
     renderKeyValueRows(sessaoInfo, campos);
   }
-
 
   function definirEstadoLogout(saindo) {
     btnLogout.disabled = saindo;
