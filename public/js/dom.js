@@ -1,4 +1,4 @@
-// Utilitários de DOM: manipulam menu mobile, escapam HTML e montam estruturas visuais repetidas.
+// Utilitários de DOM: manipulam menu mobile, limpam containers e montam estruturas visuais repetidas com segurança.
 import { DESKTOP_MENU_BREAKPOINT } from "./constants.js";
 
 export function escapeHtml(valor) {
@@ -8,6 +8,33 @@ export function escapeHtml(valor) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+export function clearElement(elemento) {
+  if (!elemento) {
+    return;
+  }
+
+  elemento.textContent = "";
+}
+
+export function createTextCell(valor, className = "") {
+  const td = document.createElement("td");
+  if (className) {
+    td.className = className;
+  }
+  td.textContent = String(valor ?? "-");
+  return td;
+}
+
+export function createTableMessageRow(colspan, texto, className = "text-center text-muted") {
+  const tr = document.createElement("tr");
+  const td = document.createElement("td");
+  td.colSpan = Number(colspan) || 1;
+  td.className = className;
+  td.textContent = texto;
+  tr.appendChild(td);
+  return tr;
 }
 
 export function setupMobileMenu({ menu, menuContent, btnOpen, btnClose, backdrop }) {
@@ -78,7 +105,7 @@ export function renderKeyValueRows(container, campos) {
     return;
   }
 
-  container.textContent = "";
+  clearElement(container);
 
   campos.forEach(function ([rotulo, valor]) {
     const linha = document.createElement("div");

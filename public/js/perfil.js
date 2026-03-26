@@ -1,6 +1,6 @@
 import { apiGet, apiPatch } from "./api.js";
 import { ensureAcceptedSession, logoutAndRedirect } from "./auth.js";
-import { escapeHtml } from "./dom.js";
+import { clearElement, createTableMessageRow, createTextCell, renderKeyValueRows } from "./dom.js";
 import { getFullName } from "./formatters.js";
 import { setFeedbackMessage } from "./messages.js";
 
@@ -41,14 +41,14 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const perfil = dados.usuario || dados;
-    perfilDados.innerHTML = `
-      <div><strong>Nome:</strong> ${escapeHtml(perfil.nome || "-")}</div>
-      <div><strong>E-mail:</strong> ${escapeHtml(perfil.email || "-")}</div>
-      <div><strong>Grupo:</strong> ${escapeHtml(perfil.grupoNome || "-")}</div>
-      <div><strong>Código do grupo:</strong> ${escapeHtml(perfil.grupoCodigo || "-")}</div>
-      <div><strong>Papel:</strong> ${escapeHtml(perfil.papel || "-")}</div>
-      <div><strong>Status:</strong> ${escapeHtml(perfil.statusGrupo || "-")}</div>
-    `;
+    renderKeyValueRows(perfilDados, [
+      ["Nome", perfil.nome || "-"],
+      ["E-mail", perfil.email || "-"],
+      ["Grupo", perfil.grupoNome || "-"],
+      ["Código do grupo", perfil.grupoCodigo || "-"],
+      ["Papel", perfil.papel || "-"],
+      ["Status", perfil.statusGrupo || "-"]
+    ]);
   }
 
   async function carregarMembros() {
@@ -58,10 +58,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const membros = Array.isArray(dados) ? dados : dados.membros || [];
-    perfilMembros.innerHTML = "";
+    clearElement(perfilMembros);
 
     if (membros.length === 0) {
-      perfilMembros.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum membro encontrado.</td></tr>';
+      perfilMembros.appendChild(createTableMessageRow(4, "Nenhum membro encontrado."));
       return;
     }
 
@@ -73,24 +73,23 @@ document.addEventListener("DOMContentLoaded", function () {
       const papel = membro.papel || usuario.papel || "-";
       const status = membro.status || membro.statusGrupo || usuario.statusGrupo || "-";
 
-      tr.innerHTML = `
-        <td>${escapeHtml(nome)}</td>
-        <td>${escapeHtml(email)}</td>
-        <td>${escapeHtml(papel)}</td>
-        <td>${escapeHtml(status)}</td>
-      `;
+      tr.appendChild(createTextCell(nome));
+      tr.appendChild(createTextCell(email));
+      tr.appendChild(createTextCell(papel));
+      tr.appendChild(createTextCell(status));
       perfilMembros.appendChild(tr);
     });
   }
 
   async function carregarSolicitacoes() {
     const { response: resposta, data: dados } = await apiGet("/meu-grupo/solicitacoes");
+    clearElement(perfilSolicitacoes);
 
     if (resposta.status === 403 || papelAtual !== "admin") {
       if (perfilAdminAviso) {
         perfilAdminAviso.textContent = "Somente o administrador do grupo pode aprovar solicitações.";
       }
-      perfilSolicitacoes.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Sem permissão para visualizar solicitações.</td></tr>';
+      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Sem permissão para visualizar solicitações."));
       return;
     }
 
@@ -103,10 +102,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const solicitacoes = Array.isArray(dados) ? dados : dados.solicitacoes || [];
-    perfilSolicitacoes.innerHTML = "";
 
     if (solicitacoes.length === 0) {
-      perfilSolicitacoes.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma solicitação pendente.</td></tr>';
+      perfilSolicitacoes.appendChild(createTableMessageRow(5, "Nenhuma solicitação pendente."));
       return;
     }
 
@@ -119,28 +117,42 @@ document.addEventListener("DOMContentLoaded", function () {
       const papel = solicitacao.papel || usuario.papel || "membro";
       const status = solicitacao.status || solicitacao.statusGrupo || usuario.statusGrupo || "pendente";
 
-      tr.innerHTML = `
-        <td>${escapeHtml(nome)}</td>
-        <td>${escapeHtml(email)}</td>
-        <td>${escapeHtml(papel)}</td>
-        <td>${escapeHtml(status)}</td>
-        <td class="text-end">
-          <div class="d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-sm btn-success" data-acao="aceitar" data-id="${id}">Aceitar</button>
-            <button type="button" class="btn btn-sm btn-outline-danger" data-acao="recusar" data-id="${id}">Recusar</button>
-          </div>
-        </td>
-      `;
+      tr.appendChild(createTextCell(nome));
+      tr.appendChild(createTextCell(email));
+      tr.appendChild(createTextCell(papel));
+      tr.appendChild(createTextCell(status));
+      tr.appendChild(createActionsCell(id));
       perfilSolicitacoes.appendChild(tr);
     });
+  }
 
-    perfilSolicitacoes.querySelectorAll("button[data-acao]").forEach(function (botao) {
-      botao.addEventListener("click", async function () {
-        const id = botao.getAttribute("data-id");
-        const acao = botao.getAttribute("data-acao");
-        await decidirSolicitacao(id, acao);
-      });
+  function createActionsCell(id) {
+    const td = document.createElement("td");
+    td.className = "text-end";
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "d-flex justify-content-end gap-2";
+
+    const btnAceitar = document.createElement("button");
+    btnAceitar.type = "button";
+    btnAceitar.className = "btn btn-sm btn-success";
+    btnAceitar.textContent = "Aceitar";
+    btnAceitar.addEventListener("click", async function () {
+      await decidirSolicitacao(id, "aceitar");
     });
+
+    const btnRecusar = document.createElement("button");
+    btnRecusar.type = "button";
+    btnRecusar.className = "btn btn-sm btn-outline-danger";
+    btnRecusar.textContent = "Recusar";
+    btnRecusar.addEventListener("click", async function () {
+      await decidirSolicitacao(id, "recusar");
+    });
+
+    wrapper.appendChild(btnAceitar);
+    wrapper.appendChild(btnRecusar);
+    td.appendChild(wrapper);
+    return td;
   }
 
   async function decidirSolicitacao(id, acao) {

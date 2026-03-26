@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { redirectIfSessionExists } from "./auth.js";
+import { clearElement } from "./dom.js";
 import { setFeedbackMessage, clearFeedbackMessage } from "./messages.js";
 import { isValidEmail, normalizeSingleWord } from "./validators.js";
 
@@ -256,7 +257,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    cadastroSugestoesGrupo.innerHTML = "";
+    clearElement(cadastroSugestoesGrupo);
 
     if (!Array.isArray(lista) || lista.length === 0) {
       esconderSugestoesGrupo();
@@ -284,7 +285,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     cadastroSugestoesGrupo.hidden = true;
-    cadastroSugestoesGrupo.innerHTML = "";
+    clearElement(cadastroSugestoesGrupo);
   }
 
 
