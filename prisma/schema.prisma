@@ -8,13 +8,18 @@ datasource db {
 
 model Usuario {
   id             Int                   @id @default(autoincrement())
-  nome           String                @unique
+  nome           String
   sobrenome      String                @default("")
   email          String                @unique
   senhaHash      String                @map("senha_hash")
+  papelGlobal    String                @default("usuario") @map("papel_global")
+  grupoAtivoId   Int?                  @map("grupo_ativo_id")
   ativo          Boolean               @default(true)
+  desativadoEm   DateTime?             @map("desativado_em")
+  excluidoEm     DateTime?             @map("excluido_em")
   criadoEm       DateTime              @default(now()) @map("criado_em")
   atualizadoEm   DateTime              @updatedAt @map("atualizado_em")
+
   usuariosGrupos UsuarioGrupo[]
   compras        Compra[]
   movimentacoes  MovimentacaoEstoque[]
@@ -27,8 +32,11 @@ model Grupo {
   id             Int                   @id @default(autoincrement())
   nome           String                @unique
   codigo         String                @unique
+  desativadoEm   DateTime?             @map("desativado_em")
+  excluidoEm     DateTime?             @map("excluido_em")
   criadoEm       DateTime              @default(now()) @map("criado_em")
   atualizadoEm   DateTime              @updatedAt @map("atualizado_em")
+
   usuariosGrupos UsuarioGrupo[]
   grupoItens     GrupoItem[]
   compras        Compra[]
@@ -39,20 +47,26 @@ model Grupo {
 }
 
 model UsuarioGrupo {
-  id              Int      @id @default(autoincrement())
-  usuarioId       Int      @map("usuario_id")
-  grupoId         Int      @map("grupo_id")
-  papel           String
-  status          String   @default("pendente")
-  solicitadoEm    DateTime @default(now()) @map("solicitado_em")
-  aprovadoEm      DateTime? @map("aprovado_em")
-  aprovadoPorEmail String?  @map("aprovado_por_email")
-  criadoEm        DateTime @default(now()) @map("criado_em")
+  id               Int       @id @default(autoincrement())
+  usuarioId        Int       @map("usuario_id")
+  grupoId          Int       @map("grupo_id")
+  papel            String
+  status           String    @default("pendente")
+  solicitadoEm     DateTime  @default(now()) @map("solicitado_em")
+  aprovadoEm       DateTime? @map("aprovado_em")
+  aprovadoPorEmail String?   @map("aprovado_por_email")
+  removidoEm       DateTime? @map("removido_em")
+  canceladoEm      DateTime? @map("cancelado_em")
+  desativadoEm     DateTime? @map("desativado_em")
+  excluidoEm       DateTime? @map("excluido_em")
+  criadoEm         DateTime  @default(now()) @map("criado_em")
 
-  usuario         Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  grupo           Grupo    @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  usuario          Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  grupo            Grupo     @relation(fields: [grupoId], references: [id], onDelete: Cascade)
 
   @@unique([usuarioId, grupoId])
+  @@index([grupoId, status])
+  @@index([usuarioId, status])
   @@map("usuarios_grupos")
 }
 
@@ -61,6 +75,7 @@ model Categoria {
   nome         String   @unique
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
   itens        Item[]
 
   @@map("categorias")
@@ -71,6 +86,8 @@ model Item {
   categoriaId   Int                   @map("categoria_id")
   nome          String                @unique
   unidadePadrao String                @map("unidade_padrao")
+  desativadoEm  DateTime?             @map("desativado_em")
+  excluidoEm    DateTime?             @map("excluido_em")
   criadoEm      DateTime              @default(now()) @map("criado_em")
   atualizadoEm  DateTime              @updatedAt @map("atualizado_em")
 
@@ -154,6 +171,7 @@ model AuditoriaLog {
   autorEmail     String?   @map("autor_email")
   grupoId        Int?      @map("grupo_id")
   itemId         Int?      @map("item_id")
+  statusHttp     Int?      @map("status_http")
   metadados      Json?
   criadoEm       DateTime  @default(now()) @map("criado_em")
 
@@ -161,5 +179,11 @@ model AuditoriaLog {
   grupo          Grupo?    @relation(fields: [grupoId], references: [id])
   item           Item?     @relation(fields: [itemId], references: [id])
 
+  @@index([entidade])
+  @@index([acao])
+  @@index([grupoId])
+  @@index([itemId])
+  @@index([autorEmail])
+  @@index([criadoEm])
   @@map("auditoria_logs")
 }
