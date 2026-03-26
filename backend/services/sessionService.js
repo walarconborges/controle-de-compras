@@ -34,8 +34,6 @@ function createSessionService(prisma) {
         sobrenome: true,
         email: true,
         ativo: true,
-        desativadoEm: true,
-        excluidoEm: true,
         usuariosGrupos: {
           where: {
             excluidoEm: null,
@@ -101,8 +99,6 @@ function createSessionService(prisma) {
       papelGlobal: "usuario",
       adminSistema,
       ativo: Boolean(usuario.ativo),
-      desativadoEm: usuario.desativadoEm,
-      excluidoEm: usuario.excluidoEm,
       grupoId: vinculoAtivo?.grupoId || null,
       grupoAtivoId: vinculoAtivo?.grupoId || null,
       grupoNome: vinculoAtivo?.grupo?.nome || contextoPrimario?.grupo?.nome || null,
