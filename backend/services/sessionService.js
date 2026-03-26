@@ -36,7 +36,6 @@ function createSessionService(prisma) {
         ativo: true,
         usuariosGrupos: {
           where: {
-            excluidoEm: null,
             grupo: {
               excluidoEm: null,
             },
@@ -49,8 +48,6 @@ function createSessionService(prisma) {
             status: true,
             solicitadoEm: true,
             aprovadoEm: true,
-            removidoEm: true,
-            canceladoEm: true,
             criadoEm: true,
             grupo: {
               select: {
@@ -119,8 +116,6 @@ function createSessionService(prisma) {
         status: vinculo.status,
         solicitadoEm: vinculo.solicitadoEm,
         aprovadoEm: vinculo.aprovadoEm,
-        removidoEm: vinculo.removidoEm,
-        canceladoEm: vinculo.canceladoEm,
       })),
     };
   }
