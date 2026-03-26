@@ -4,7 +4,7 @@ function obterAutor(req) {
   return {
     usuarioAutorId: req.session?.usuario?.id ?? null,
     autorEmail: req.session?.usuario?.email ?? null,
-    grupoId: req.session?.usuario?.grupoId ?? null,
+    grupoId: req.session?.usuario?.grupoId ?? req.session?.usuario?.grupoAtivoId ?? null,
   };
 }
 
@@ -30,4 +30,18 @@ async function registrarAuditoria(prisma, req, dados = {}) {
   });
 }
 
-module.exports = { registrarAuditoria, obterAutor };
+function criarMiddlewareAuditoria(prisma) {
+  return function middlewareAuditoria(req, res, next) {
+    req.registrarAuditoria = async function registrarAuditoriaDaRequisicao(dados = {}) {
+      return registrarAuditoria(prisma, req, dados);
+    };
+
+    next();
+  };
+}
+
+module.exports = {
+  obterAutor,
+  registrarAuditoria,
+  criarMiddlewareAuditoria,
+};
