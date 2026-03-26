@@ -5,6 +5,7 @@
 const { Prisma } = require("@prisma/client");
 const { ZodError } = require("zod");
 const { AppError } = require("../utils/errorUtils");
+const { logger } = require("../utils/logger");
 
 function extrairMensagemZod(error) {
   if (!(error instanceof ZodError) || !Array.isArray(error.issues) || error.issues.length === 0) {
@@ -98,7 +99,9 @@ function mapearErro(error) {
 }
 
 function logarErro(error, req, mapped) {
-  const payload = {
+  const requestLogger = req?.log || logger;
+
+  requestLogger.error("Erro tratado pelo middleware global", {
     statusCode: mapped.statusCode,
     code: mapped.code,
     message: error?.message || mapped.publicMessage,
@@ -106,12 +109,12 @@ function logarErro(error, req, mapped) {
     method: req?.method || error?.context?.method || null,
     originalUrl: req?.originalUrl || error?.context?.originalUrl || null,
     ip: req?.ip || error?.context?.ip || null,
+    requestId: req?.requestId || error?.context?.requestId || null,
     usuarioId: req?.session?.usuario?.id || error?.context?.usuarioId || null,
     grupoId: req?.session?.usuario?.grupoId || error?.context?.grupoId || null,
-    stack: mapped.statusCode >= 500 ? error?.stack || null : null,
-  };
-
-  console.error("[ERROR]", payload);
+    grupoAtivoId: req?.session?.usuario?.grupoAtivoId || error?.context?.grupoAtivoId || null,
+    error,
+  });
 }
 
 function notFoundHandler(req, res, next) {
@@ -138,6 +141,7 @@ function errorHandler(error, req, res, next) {
     response.debug = {
       code: mapped.code,
       message: error?.message || null,
+      requestId: req?.requestId || null,
     };
   }
 

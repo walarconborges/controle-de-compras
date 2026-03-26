@@ -35,6 +35,8 @@ const {
 } = require("./utils/normalizers");
 const { createSessionService } = require("./services/sessionService");
 const { criarMiddlewareAuditoria } = require("./utils/audit");
+const { logger } = require("./utils/logger");
+const { criarRequestLoggerMiddleware } = require("./middlewares/requestLoggerMiddleware");
 
 const registerDiagnosticRoutes = require("./routes/diagnosticRoutes");
 const registerCategoriaItemRoutes = require("./routes/categoriaItemRoutes");
@@ -115,9 +117,11 @@ app.use(
   })
 );
 
+app.use(criarRequestLoggerMiddleware());
 app.use(criarMiddlewareAuditoria(prisma));
 
 const sessionService = createSessionService(prisma);
+app.locals.logger = logger;
 
 const deps = {
   app,
@@ -162,20 +166,20 @@ const PORTA = Number(process.env.PORT) || 3001;
 const HOST = "0.0.0.0";
 
 const servidor = app.listen(PORTA, HOST, () => {
-  console.log(`Servidor rodando em ${HOST}:${PORTA}`);
+  logger.info("Servidor iniciado", { host: HOST, porta: PORTA });
 });
 
 async function encerrarServidor(sinal) {
-  console.log(`Encerrando servidor por ${sinal}...`);
+  logger.info("Encerrando servidor", { sinal });
 
   servidor.close(async () => {
     try {
       await prisma.$disconnect();
       await sessionPool.end();
-      console.log("Conexões encerradas com sucesso.");
+      logger.info("Conexões encerradas com sucesso", { sinal });
       process.exit(0);
     } catch (error) {
-      console.error("Erro ao encerrar recursos do servidor:", error);
+      logger.error("Erro ao encerrar recursos do servidor", { sinal, error });
       process.exit(1);
     }
   });
@@ -183,3 +187,9 @@ async function encerrarServidor(sinal) {
 
 process.on("SIGINT", () => encerrarServidor("SIGINT"));
 process.on("SIGTERM", () => encerrarServidor("SIGTERM"));
+process.on("unhandledRejection", (reason) => {
+  logger.error("Promise rejeitada sem tratamento", { reason });
+});
+process.on("uncaughtException", (error) => {
+  logger.error("Exceção não capturada", { error });
+});

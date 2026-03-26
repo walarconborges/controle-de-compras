@@ -21,8 +21,10 @@ function criarContextoRequest(req) {
     method: req?.method || null,
     originalUrl: req?.originalUrl || null,
     ip: req?.ip || null,
+    requestId: req?.requestId || null,
     usuarioId: req?.session?.usuario?.id || null,
     grupoId: req?.session?.usuario?.grupoId || null,
+    grupoAtivoId: req?.session?.usuario?.grupoAtivoId || null,
   };
 }
 

@@ -1,7 +1,9 @@
 /**
  * Utilitários de auditoria.
- * Registra operações mutáveis em log global consolidado.
+ * Registra operações mutáveis em log global consolidado e reporta falhas por logger estruturado.
  */
+const { logger } = require("./logger");
+
 function inferirEntidadePorCaminho(pathname = "") {
   const mapa = [
     ["usuarios-grupos", "usuario_grupo"],
@@ -38,11 +40,20 @@ function inferirAcaoPorMetodo(method = "GET", statusCode = 200) {
   }
 }
 
-async function criarLogAuditoria(prisma, data) {
+async function criarLogAuditoria(prisma, data, context = {}) {
   try {
     await prisma.auditoriaLog.create({ data });
   } catch (error) {
-    console.error("Falha ao registrar log de auditoria:", error);
+    logger.error("Falha ao registrar log de auditoria", {
+      ...context,
+      entidade: data?.entidade || null,
+      entidadeId: data?.entidadeId || null,
+      acao: data?.acao || null,
+      usuarioAutorId: data?.usuarioAutorId || null,
+      grupoId: data?.grupoId || null,
+      statusHttp: data?.statusHttp || null,
+      error,
+    });
   }
 }
 
@@ -63,22 +74,32 @@ function criarMiddlewareAuditoria(prisma) {
       const usuario = req.session?.usuario || {};
       const entidade = inferirEntidadePorCaminho(req.path);
       const acao = inferirAcaoPorMetodo(metodo, res.statusCode);
+      const context = {
+        requestId: req.requestId || null,
+        method: metodo,
+        route: req.originalUrl || req.path || null,
+      };
 
-      criarLogAuditoria(prisma, {
-        entidade,
-        entidadeId: Number(req.params?.id || req.params?.usuarioId || req.params?.grupoId || 0) || null,
-        acao,
-        descricao: `${metodo} ${req.path}`,
-        usuarioAutorId: Number(usuario.id || 0) || null,
-        grupoId: Number(usuario.grupoId || req.body?.grupoId || req.query?.grupoId || 0) || null,
-        statusHttp: res.statusCode,
-        metadados: {
-          metodo,
-          path: req.path,
-          body: req.body || {},
-          query: req.query || {},
+      criarLogAuditoria(
+        prisma,
+        {
+          entidade,
+          entidadeId: Number(req.params?.id || req.params?.usuarioId || req.params?.grupoId || 0) || null,
+          acao,
+          descricao: `${metodo} ${req.path}`,
+          usuarioAutorId: Number(usuario.id || 0) || null,
+          grupoId: Number(usuario.grupoId || req.body?.grupoId || req.query?.grupoId || 0) || null,
+          statusHttp: res.statusCode,
+          metadados: {
+            metodo,
+            path: req.path,
+            requestId: req.requestId || null,
+            body: req.body || {},
+            query: req.query || {},
+          },
         },
-      });
+        context
+      );
     });
 
     next();
