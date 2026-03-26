@@ -37,7 +37,9 @@ function createSessionService(prisma) {
         usuariosGrupos: {
           where: {
             grupo: {
-              excluidoEm: null,
+              is: {
+                excluidoEm: null,
+              },
             },
           },
           orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
