@@ -22,6 +22,54 @@ function normalizarPapelGrupo(papel) {
   return "membro";
 }
 
+async function sincronizarGrupoAtivoUsuario(prisma, usuarioId) {
+  const usuarioNumero = Number(usuarioId);
+
+  if (!Number.isInteger(usuarioNumero) || usuarioNumero <= 0) {
+    return null;
+  }
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: usuarioNumero },
+    select: { grupoAtivoId: true },
+  });
+
+  const vinculosAceitos = await prisma.usuarioGrupo.findMany({
+    where: {
+      usuarioId: usuarioNumero,
+      status: "aceito",
+      excluidoEm: null,
+      grupo: {
+        is: {
+          excluidoEm: null,
+          desativadoEm: null,
+        },
+      },
+    },
+    orderBy: [{ id: "asc" }],
+    select: { grupoId: true },
+  });
+
+  const grupoAtivoAtual = usuario?.grupoAtivoId ?? null;
+  const grupoAtivoPermaneceValido = vinculosAceitos.some(
+    (vinculo) => Number(vinculo.grupoId) === Number(grupoAtivoAtual)
+  );
+
+  const proximoGrupoAtivo = grupoAtivoPermaneceValido
+    ? grupoAtivoAtual
+    : vinculosAceitos[0]?.grupoId ?? null;
+
+  if (grupoAtivoAtual !== proximoGrupoAtivo) {
+    await prisma.usuario.update({
+      where: { id: usuarioNumero },
+      data: { grupoAtivoId: proximoGrupoAtivo },
+    });
+  }
+
+  return proximoGrupoAtivo;
+}
+
+
 module.exports = function registerAuthRoutes(app, deps) {
   const {
     prisma,
@@ -360,6 +408,8 @@ module.exports = function registerAuthRoutes(app, deps) {
         data: { grupoAtivoId: grupoId },
       });
 
+      await sincronizarGrupoAtivoUsuario(prisma, usuarioId);
+
       const usuario = await atualizarSessaoUsuario(req, usuarioId);
 
       res.json({
@@ -461,6 +511,8 @@ module.exports = function registerAuthRoutes(app, deps) {
         },
         include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } } },
       });
+
+      await sincronizarGrupoAtivoUsuario(prisma, atualizado.usuario.id);
 
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",
@@ -588,6 +640,8 @@ module.exports = function registerAuthRoutes(app, deps) {
         },
       });
 
+      await sincronizarGrupoAtivoUsuario(prisma, usuarioId);
+
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",
         entidadeId: atualizado.id,
@@ -620,33 +674,16 @@ module.exports = function registerAuthRoutes(app, deps) {
         return res.status(404).json({ erro: "Vínculo não encontrado" });
       }
 
-      await prisma.$transaction(async (tx) => {
-        await tx.usuarioGrupo.update({
-          where: { id: vinculo.id },
-          data: {
-            status: "saiu",
-            removidoEm: new Date(),
-            excluidoEm: new Date(),
-          },
-        });
-
-        const proximoVinculo = await tx.usuarioGrupo.findFirst({
-          where: {
-            usuarioId,
-            status: "aceito",
-            excluidoEm: null,
-            grupoId: { not: grupoId },
-          },
-          orderBy: { id: "asc" },
-        });
-
-        await tx.usuario.update({
-          where: { id: usuarioId },
-          data: {
-            grupoAtivoId: proximoVinculo?.grupoId || null,
-          },
-        });
+      await prisma.usuarioGrupo.update({
+        where: { id: vinculo.id },
+        data: {
+          status: "saiu",
+          removidoEm: new Date(),
+          excluidoEm: new Date(),
+        },
       });
+
+      await sincronizarGrupoAtivoUsuario(prisma, usuarioId);
 
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",
@@ -742,28 +779,16 @@ module.exports = function registerAuthRoutes(app, deps) {
         return res.status(404).json({ erro: "Convite não encontrado" });
       }
 
-      await prisma.$transaction(async (tx) => {
-        await tx.usuarioGrupo.update({
-          where: { id },
-          data: {
-            status: "aceito",
-            aprovadoEm: new Date(),
-            aprovadoPorEmail: req.session.usuario.email,
-          },
-        });
-
-        const usuarioAtual = await tx.usuario.findUnique({
-          where: { id: usuarioId },
-          select: { grupoAtivoId: true },
-        });
-
-        if (!usuarioAtual?.grupoAtivoId) {
-          await tx.usuario.update({
-            where: { id: usuarioId },
-            data: { grupoAtivoId: vinculo.grupoId },
-          });
-        }
+      await prisma.usuarioGrupo.update({
+        where: { id },
+        data: {
+          status: "aceito",
+          aprovadoEm: new Date(),
+          aprovadoPorEmail: req.session.usuario.email,
+        },
       });
+
+      await sincronizarGrupoAtivoUsuario(prisma, usuarioId);
 
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",

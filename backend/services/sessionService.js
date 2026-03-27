@@ -1,6 +1,6 @@
 /**
  * Monta e atualiza a sessão autenticada a partir do schema real.
- * A sessão precisa refletir papel global, vínculo por grupo e grupo ativo persistido.
+ * A sessão reflete papel global, vínculos por grupo e grupo ativo persistido.
  */
 
 const STATUS_VINCULO_RELEVANTES = new Set([
@@ -75,6 +75,7 @@ function createSessionService(prisma) {
             grupo: {
               is: {
                 excluidoEm: null,
+                desativadoEm: null,
               },
             },
           },
@@ -104,7 +105,7 @@ function createSessionService(prisma) {
       },
     });
 
-    if (!usuario || usuario.excluidoEm || !usuario.ativo) {
+    if (!usuario || usuario.excluidoEm || !usuario.ativo || usuario.desativadoEm) {
       return null;
     }
 
@@ -112,28 +113,24 @@ function createSessionService(prisma) {
       STATUS_VINCULO_RELEVANTES.has(vinculo.status)
     );
 
-    const vinculosAceitos = vinculosRelevantes.filter(
-      (vinculo) =>
-        vinculo.status === "aceito" &&
-        vinculo.grupo &&
-        !vinculo.grupo.excluidoEm &&
-        !vinculo.grupo.desativadoEm
-    );
+    const vinculosAceitos = vinculosRelevantes.filter((vinculo) => vinculo.status === "aceito");
 
     let vinculoAtivo = null;
+    const grupoAtivoPersistido = usuario.grupoAtivoId ? Number(usuario.grupoAtivoId) : null;
 
-    if (usuario.grupoAtivoId) {
+    if (grupoAtivoPersistido) {
       vinculoAtivo =
-        vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === Number(usuario.grupoAtivoId)) || null;
+        vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === grupoAtivoPersistido) || null;
     }
 
     if (!vinculoAtivo && vinculosAceitos.length === 1) {
       vinculoAtivo = vinculosAceitos[0];
     }
 
-    const contextoPrimario = vinculoAtivo || vinculosRelevantes[0] || null;
+    const contextoPrimario = vinculoAtivo || vinculosAceitos[0] || vinculosRelevantes[0] || null;
     const papelGlobal = usuario.papelGlobal || "usuario";
     const adminSistema = papelGlobal === "adminSistema";
+    const grupoAtivoId = vinculoAtivo?.grupoId || null;
 
     return {
       id: usuario.id,
@@ -146,12 +143,12 @@ function createSessionService(prisma) {
       ativo: Boolean(usuario.ativo),
       desativadoEm: usuario.desativadoEm || null,
       excluidoEm: usuario.excluidoEm || null,
-      grupoId: vinculoAtivo?.grupoId || null,
-      grupoAtivoId: vinculoAtivo?.grupoId || usuario.grupoAtivoId || null,
+      grupoId: grupoAtivoId,
+      grupoAtivoId,
       grupoNome: vinculoAtivo?.grupo?.nome || contextoPrimario?.grupo?.nome || null,
       grupoCodigo: vinculoAtivo?.grupo?.codigo || contextoPrimario?.grupo?.codigo || null,
       papel: vinculoAtivo?.papel || null,
-      statusGrupo: contextoPrimario?.status || null,
+      statusGrupo: vinculoAtivo?.status || contextoPrimario?.status || null,
       temGrupoAceito: vinculosAceitos.length > 0,
       quantidadeGruposAceitos: vinculosAceitos.length,
       quantidadeVinculosRelevantes: vinculosRelevantes.length,
@@ -168,12 +165,7 @@ function createSessionService(prisma) {
 
     const sessaoUsuario = await montarSessaoUsuarioPorUsuarioId(usuarioId);
 
-    if (!sessaoUsuario) {
-      req.session.usuario = null;
-      return null;
-    }
-
-    req.session.usuario = sessaoUsuario;
+    req.session.usuario = sessaoUsuario || null;
     return sessaoUsuario;
   }
 

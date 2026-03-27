@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const session = require("express-session");
 const request = require("supertest");
 const bcrypt = require("bcrypt");
@@ -13,6 +14,7 @@ const registerUsuarioRoutes = require("../../routes/usuarioRoutes");
 const registerUsuarioGrupoRoutes = require("../../routes/usuarioGrupoRoutes");
 const registerGrupoRoutes = require("../../routes/grupoRoutes");
 const registerCompraRoutes = require("../../routes/compraRoutes");
+const registerSystemRoutes = require("../../routes/systemRoutes");
 
 function criarLoggerSilencioso() {
   return {
@@ -31,6 +33,8 @@ function criarDependenciasBasicas(prisma, bcryptMock) {
 
   return {
     prisma,
+    path,
+    PUBLIC_PATH: path.resolve(__dirname, "../../../public"),
     ...authMiddleware,
     ...normalizers,
     ...sessionService,
@@ -83,6 +87,7 @@ function createTestApp({ routes = [], prisma, bcryptMock } = {}) {
     usuariosGrupos: registerUsuarioGrupoRoutes,
     grupos: registerGrupoRoutes,
     compras: registerCompraRoutes,
+    system: registerSystemRoutes,
   };
 
   routes.forEach((routeName) => {

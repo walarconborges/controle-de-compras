@@ -104,4 +104,35 @@ describe("Autorização por grupo", () => {
 
     await agent.get("/usuarios").expect(403);
   });
+
+  test("adminGrupo vê apenas logs do próprio grupo em /auditoria-logs", async () => {
+    const prisma = criarPrismaMock();
+    prisma.auditoriaLog.findMany.mockResolvedValue([]);
+
+    const { app, request } = createTestApp({
+      routes: ["system"],
+      prisma,
+    });
+
+    const agent = request.agent(app);
+    await autenticarSessao(
+      agent,
+      criarSessaoUsuario({
+        papel: "adminGrupo",
+        statusGrupo: "aceito",
+        grupoId: 10,
+        grupoAtivoId: 10,
+      })
+    );
+
+    await agent.get("/auditoria-logs").expect(200);
+
+    expect(prisma.auditoriaLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          grupoId: 10,
+        }),
+      })
+    );
+  });
 });
