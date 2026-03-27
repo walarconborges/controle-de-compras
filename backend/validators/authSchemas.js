@@ -8,6 +8,7 @@ const {
   emailSchema,
   senhaObrigatoriaSchema,
   senhaMinimaCadastroSchema,
+  senhaOpcionalSchema,
   nomeGrupoSchema,
   idParamSchema,
 } = require("./commonSchemas");
@@ -29,9 +30,22 @@ const loginBodySchema = z.object({
   senha: senhaObrigatoriaSchema,
 });
 
+const atualizarMeuPerfilBodySchema = z.object({
+  nome: textoObrigatorio("nome"),
+  sobrenome: textoObrigatorio("sobrenome"),
+  email: emailSchema,
+  senha: senhaOpcionalSchema,
+});
+
+const grupoAtivoBodySchema = z.object({
+  grupoId: z.coerce.number().int().positive("Grupo inválido"),
+});
+
 module.exports = {
   sugestoesGrupoQuerySchema,
   cadastroBodySchema,
   loginBodySchema,
+  atualizarMeuPerfilBodySchema,
+  grupoAtivoBodySchema,
   solicitacaoIdParamSchema: idParamSchema,
 };

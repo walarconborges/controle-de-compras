@@ -12,3 +12,13 @@ table td,
 table th {
   vertical-align: middle;
 }
+
+
+#perfil-dados > div + div {
+  margin-top: 0.25rem;
+}
+
+#secao-vinculos[hidden],
+#secao-pendencias[hidden] {
+  display: none !important;
+}

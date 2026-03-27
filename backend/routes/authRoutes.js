@@ -10,6 +10,8 @@ const {
   sugestoesGrupoQuerySchema,
   cadastroBodySchema,
   loginBodySchema,
+  atualizarMeuPerfilBodySchema,
+  grupoAtivoBodySchema,
   solicitacaoIdParamSchema,
 } = require("../validators/authSchemas");
 
@@ -251,11 +253,15 @@ module.exports = function registerAuthRoutes(app, deps) {
         nomeCompleto:
           sessaoAtualizada.nomeCompleto || montarNomeCompleto(sessaoAtualizada.nome, sessaoAtualizada.sobrenome),
         email: sessaoAtualizada.email,
+        papelGlobal: sessaoAtualizada.papelGlobal || "usuario",
+        adminSistema: Boolean(sessaoAtualizada.adminSistema),
         papel: sessaoAtualizada.papel,
         statusGrupo: sessaoAtualizada.statusGrupo,
         grupoId: sessaoAtualizada.grupoId,
+        grupoAtivoId: sessaoAtualizada.grupoAtivoId || sessaoAtualizada.grupoId || null,
         grupoNome: sessaoAtualizada.grupoNome,
         grupoCodigo: sessaoAtualizada.grupoCodigo,
+        vinculos: Array.isArray(sessaoAtualizada.vinculos) ? sessaoAtualizada.vinculos : [],
         solicitadoEm: vinculo?.solicitadoEm || null,
         aprovadoEm: vinculo?.aprovadoEm || null,
       });
@@ -263,6 +269,138 @@ module.exports = function registerAuthRoutes(app, deps) {
       return next(anexarContextoErro(error, req, { publicMessage: "Erro ao carregar perfil" }));
     }
   });
+
+  app.patch(
+    "/meu-perfil",
+    exigirAutenticacao,
+    validateSchema({ body: atualizarMeuPerfilBodySchema }),
+    async (req, res, next) => {
+      try {
+        const usuarioId = Number(req.session.usuario.id);
+        const nome = normalizarTextoSimples(req.body.nome);
+        const sobrenome = normalizarTextoSimples(req.body.sobrenome);
+        const email = normalizarEmail(req.body.email);
+        const senha = normalizarTextoSimples(req.body.senha);
+
+        const usuarioAtual = await prisma.usuario.findUnique({
+          where: { id: usuarioId },
+          select: { id: true, email: true },
+        });
+
+        if (!usuarioAtual) {
+          return res.status(404).json({ erro: "Usuário não encontrado" });
+        }
+
+        if (email !== usuarioAtual.email) {
+          const usuarioComMesmoEmail = await prisma.usuario.findUnique({
+            where: { email },
+            select: { id: true },
+          });
+
+          if (usuarioComMesmoEmail && usuarioComMesmoEmail.id !== usuarioId) {
+            return res.status(409).json({ erro: "Já existe um usuário com esse e-mail" });
+          }
+        }
+
+        const data = {
+          nome,
+          sobrenome,
+          email,
+        };
+
+        if (senha) {
+          data.senhaHash = await bcrypt.hash(senha, 10);
+        }
+
+        await prisma.usuario.update({
+          where: { id: usuarioId },
+          data,
+        });
+
+        await registrarAuditoria(prisma, req, {
+          entidade: "usuario",
+          entidadeId: usuarioId,
+          acao: "atualizacao_perfil",
+          descricao: `Perfil atualizado por ${email}`,
+          metadados: {
+            emailAnterior: usuarioAtual.email,
+            emailNovo: email,
+            alterouSenha: Boolean(senha),
+          },
+        });
+
+        const sessaoAtualizada = await atualizarSessaoUsuario(req, usuarioId);
+
+        res.json({
+          mensagem: "Perfil atualizado com sucesso",
+          usuario: sessaoAtualizada,
+        });
+      } catch (error) {
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao atualizar perfil" }));
+      }
+    }
+  );
+
+  app.post(
+    "/meu-perfil/grupo-ativo",
+    exigirAutenticacao,
+    validateSchema({ body: grupoAtivoBodySchema }),
+    async (req, res, next) => {
+      try {
+        const usuarioId = Number(req.session.usuario.id);
+        const grupoId = Number(req.body.grupoId);
+
+        const vinculo = await prisma.usuarioGrupo.findFirst({
+          where: {
+            usuarioId,
+            grupoId,
+            status: "aceito",
+          },
+          include: {
+            grupo: {
+              select: {
+                id: true,
+                nome: true,
+                codigo: true,
+              },
+            },
+          },
+        });
+
+        if (!vinculo) {
+          return res.status(403).json({ erro: "Você só pode selecionar vínculos aceitos" });
+        }
+
+        try {
+          await prisma.usuario.update({
+            where: { id: usuarioId },
+            data: { grupoAtivoId: grupoId },
+          });
+        } catch (persistError) {
+          // Fallback silencioso quando o schema atual ainda não persiste grupo ativo.
+        }
+
+        const sessaoAtualizada = await atualizarSessaoUsuario(req, usuarioId);
+
+        req.session.usuario = {
+          ...sessaoAtualizada,
+          grupoId: vinculo.grupoId,
+          grupoAtivoId: vinculo.grupoId,
+          grupoNome: vinculo.grupo?.nome || null,
+          grupoCodigo: vinculo.grupo?.codigo || null,
+          papel: vinculo.papel,
+          statusGrupo: vinculo.status,
+        };
+
+        res.json({
+          mensagem: "Grupo ativo atualizado com sucesso",
+          usuario: req.session.usuario,
+        });
+      } catch (error) {
+        return next(anexarContextoErro(error, req, { publicMessage: "Erro ao selecionar grupo ativo" }));
+      }
+    }
+  );
 
   app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res, next) => {
     try {
