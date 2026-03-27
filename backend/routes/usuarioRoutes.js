@@ -11,6 +11,11 @@ const {
   usuarioUpdateBodySchema,
 } = require("../validators/usuarioSchemas");
 
+function parseGrupoId(valor) {
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
 module.exports = function registerUsuarioRoutes(app, deps) {
   const {
     prisma,
@@ -23,16 +28,40 @@ module.exports = function registerUsuarioRoutes(app, deps) {
     bcrypt,
   } = deps;
 
+  function ehAdminSistema(req) {
+    return Boolean(req.session.usuario?.adminSistema);
+  }
+
+  function obterGrupoAlvo(req, { obrigatorio = true, preferirBody = false } = {}) {
+    if (!ehAdminSistema(req)) {
+      const grupoIdSessao = obterGrupoIdSessao(req);
+      return parseGrupoId(grupoIdSessao);
+    }
+
+    const grupoIdBody = preferirBody ? parseGrupoId(req.body?.grupoId) : null;
+    const grupoIdQuery = parseGrupoId(req.query?.grupoId);
+    const grupoIdSessao = parseGrupoId(obterGrupoIdSessao(req));
+
+    const grupoId = grupoIdBody || grupoIdQuery || grupoIdSessao || null;
+
+    if (!grupoId && obrigatorio) {
+      return null;
+    }
+
+    return grupoId;
+  }
+
   app.get("/usuarios", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const adminSistema = ehAdminSistema(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       const vinculos = await prisma.usuarioGrupo.findMany({
         where: {
-          grupoId,
           excluidoEm: null,
+          ...(grupoId ? { grupoId } : {}),
         },
-        orderBy: { id: "asc" },
+        orderBy: [{ grupoId: "asc" }, { id: "asc" }],
         include: {
           usuario: {
             select: {
@@ -55,6 +84,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
             ...normalizarUsuarioResposta(vinculo.usuario),
             papel: vinculo.papel,
             status: vinculo.status,
+            grupoId: vinculo.grupoId,
           }))
       );
     } catch (error) {
@@ -65,14 +95,16 @@ module.exports = function registerUsuarioRoutes(app, deps) {
   app.get("/usuarios/:id", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: usuarioIdParamSchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const grupoId = obterGrupoIdSessao(req);
+      const adminSistema = ehAdminSistema(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
         where: {
-          grupoId,
           usuarioId: id,
           excluidoEm: null,
+          ...(grupoId ? { grupoId } : {}),
         },
+        orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
         include: {
           usuario: {
             select: {
@@ -89,13 +121,33 @@ module.exports = function registerUsuarioRoutes(app, deps) {
       });
 
       if (!vinculo || !vinculo.usuario) {
-        return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
+        const usuario = adminSistema
+          ? await prisma.usuario.findUnique({
+              where: { id },
+              select: {
+                id: true,
+                nome: true,
+                sobrenome: true,
+                email: true,
+                ativo: true,
+                criadoEm: true,
+                atualizadoEm: true,
+              },
+            })
+          : null;
+
+        if (!usuario) {
+          return res.status(404).json({ erro: "Usuário não encontrado" });
+        }
+
+        return res.json(normalizarUsuarioResposta(usuario));
       }
 
       res.json({
         ...normalizarUsuarioResposta(vinculo.usuario),
         papel: vinculo.papel,
         status: vinculo.status,
+        grupoId: vinculo.grupoId,
       });
     } catch (error) {
       return next(anexarContextoErro(error, req, { publicMessage: "Erro ao buscar usuário" }));
@@ -104,7 +156,12 @@ module.exports = function registerUsuarioRoutes(app, deps) {
 
   app.post("/usuarios", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ body: usuarioCreateBodySchema }), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: true, preferirBody: true });
+
+      if (!grupoId) {
+        return res.status(400).json({ erro: "Informe um grupo válido para criar o usuário" });
+      }
+
       const nome = normalizarTextoSimples(req.body.nome);
       const sobrenome = normalizarTextoSimples(req.body.sobrenome);
       const email = normalizarEmail(req.body.email);
@@ -165,9 +222,9 @@ module.exports = function registerUsuarioRoutes(app, deps) {
   app.put("/usuarios/:id", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: usuarioIdParamSchema, body: usuarioUpdateBodySchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const ehAdminSistema = Boolean(req.session.usuario?.adminSistema);
+      const adminSistema = ehAdminSistema(req);
 
-      if (!ehAdminSistema && id !== Number(req.session.usuario.id)) {
+      if (!adminSistema && id !== Number(req.session.usuario.id)) {
         return res.status(403).json({ erro: "adminGrupo não pode editar a conta global de outro usuário" });
       }
 
@@ -179,7 +236,7 @@ module.exports = function registerUsuarioRoutes(app, deps) {
 
       const dadosAtualizacao = { nome, sobrenome, email };
 
-      if (ehAdminSistema && typeof ativo === "boolean") {
+      if (adminSistema && typeof ativo === "boolean") {
         dadosAtualizacao.ativo = ativo;
       }
 
@@ -218,19 +275,26 @@ module.exports = function registerUsuarioRoutes(app, deps) {
   app.delete("/usuarios/:id", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: usuarioIdParamSchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
-      const vinculo = await prisma.usuarioGrupo.findFirst({
+      const vinculos = await prisma.usuarioGrupo.findMany({
         where: {
-          grupoId,
           usuarioId: id,
           excluidoEm: null,
+          ...(grupoId ? { grupoId } : {}),
         },
+        orderBy: [{ criadoEm: "desc" }, { id: "desc" }],
       });
 
-      if (!vinculo) {
-        return res.status(404).json({ erro: "Usuário não encontrado no seu grupo" });
+      if (!vinculos.length) {
+        return res.status(404).json({ erro: "Vínculo do usuário não encontrado" });
       }
+
+      if (ehAdminSistema(req) && !grupoId && vinculos.length > 1) {
+        return res.status(400).json({ erro: "Informe o grupoId para remover o vínculo correto" });
+      }
+
+      const vinculo = vinculos[0];
 
       await prisma.usuarioGrupo.update({
         where: { id: vinculo.id },

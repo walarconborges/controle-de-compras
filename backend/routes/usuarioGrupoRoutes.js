@@ -17,19 +17,45 @@ function normalizarPapelGrupo(papel) {
   return "membro";
 }
 
+function parseGrupoId(valor) {
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
 module.exports = function registerUsuarioGrupoRoutes(app, deps) {
   const { prisma, exigirAutenticacao, exigirPapel, obterGrupoIdSessao, idsSaoIguais } = deps;
 
+  function ehAdminSistema(req) {
+    return Boolean(req.session.usuario?.adminSistema);
+  }
+
+  function obterGrupoAlvo(req, { obrigatorio = true, preferirBody = false } = {}) {
+    if (!ehAdminSistema(req)) {
+      return parseGrupoId(obterGrupoIdSessao(req));
+    }
+
+    const grupoIdBody = preferirBody ? parseGrupoId(req.body?.grupoId) : null;
+    const grupoIdQuery = parseGrupoId(req.query?.grupoId);
+    const grupoIdSessao = parseGrupoId(obterGrupoIdSessao(req));
+    const grupoId = grupoIdBody || grupoIdQuery || grupoIdSessao || null;
+
+    if (!grupoId && obrigatorio) {
+      return null;
+    }
+
+    return grupoId;
+  }
+
   app.get("/usuarios-grupos", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       const vinculos = await prisma.usuarioGrupo.findMany({
         where: {
-          grupoId,
           excluidoEm: null,
+          ...(grupoId ? { grupoId } : {}),
         },
-        orderBy: { id: "asc" },
+        orderBy: [{ grupoId: "asc" }, { id: "asc" }],
         include: {
           usuario: {
             select: {
@@ -53,10 +79,14 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
   app.get("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: usuarioGrupoIdParamSchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, grupoId, excluidoEm: null },
+        where: {
+          id,
+          excluidoEm: null,
+          ...(grupoId ? { grupoId } : {}),
+        },
         include: {
           usuario: { select: { id: true, nome: true, sobrenome: true, email: true, ativo: true } },
           grupo: true,
@@ -64,7 +94,7 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
       });
 
       if (!vinculo) {
-        return res.status(404).json({ erro: "Vínculo não encontrado no seu grupo" });
+        return res.status(404).json({ erro: "Vínculo não encontrado" });
       }
 
       res.json(vinculo);
@@ -78,9 +108,9 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
       const usuarioId = Number(req.body.usuarioId);
       const grupoId = Number(req.body.grupoId);
       const papel = normalizarPapelGrupo(req.body.papel);
-      const grupoIdSessao = obterGrupoIdSessao(req);
+      const grupoIdSessao = parseGrupoId(obterGrupoIdSessao(req));
 
-      if (!idsSaoIguais(grupoId, grupoIdSessao) && !req.session.usuario?.adminSistema) {
+      if (!ehAdminSistema(req) && !idsSaoIguais(grupoId, grupoIdSessao)) {
         return res.status(403).json({ erro: "Não é permitido criar vínculo em outro grupo" });
       }
 
@@ -140,18 +170,22 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
       const usuarioId = Number(req.body.usuarioId);
       const grupoId = Number(req.body.grupoId);
       const papel = normalizarPapelGrupo(req.body.papel);
-      const grupoIdSessao = obterGrupoIdSessao(req);
-
-      if (!idsSaoIguais(grupoId, grupoIdSessao) && !req.session.usuario?.adminSistema) {
-        return res.status(403).json({ erro: "Não é permitido mover vínculo para outro grupo" });
-      }
+      const grupoIdSessao = parseGrupoId(obterGrupoIdSessao(req));
 
       const vinculoExistente = await prisma.usuarioGrupo.findFirst({
-        where: { id, grupoId: grupoIdSessao, excluidoEm: null },
+        where: {
+          id,
+          excluidoEm: null,
+          ...(!ehAdminSistema(req) ? { grupoId: grupoIdSessao } : {}),
+        },
       });
 
       if (!vinculoExistente) {
-        return res.status(404).json({ erro: "Vínculo não encontrado no seu grupo" });
+        return res.status(404).json({ erro: "Vínculo não encontrado" });
+      }
+
+      if (!ehAdminSistema(req) && !idsSaoIguais(grupoId, grupoIdSessao)) {
+        return res.status(403).json({ erro: "Não é permitido mover vínculo para outro grupo" });
       }
 
       const vinculo = await prisma.usuarioGrupo.update({
@@ -180,14 +214,18 @@ module.exports = function registerUsuarioGrupoRoutes(app, deps) {
   app.delete("/usuarios-grupos/:id", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: usuarioGrupoIdParamSchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, grupoId, excluidoEm: null },
+        where: {
+          id,
+          excluidoEm: null,
+          ...(grupoId ? { grupoId } : {}),
+        },
       });
 
       if (!vinculo) {
-        return res.status(404).json({ erro: "Vínculo não encontrado no seu grupo" });
+        return res.status(404).json({ erro: "Vínculo não encontrado" });
       }
 
       await prisma.usuarioGrupo.update({

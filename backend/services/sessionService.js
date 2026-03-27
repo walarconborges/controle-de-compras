@@ -127,10 +127,18 @@ function createSessionService(prisma) {
       vinculoAtivo = vinculosAceitos[0];
     }
 
+    const grupoAtivoCorrigido = vinculoAtivo?.grupoId || null;
+
+    if ((grupoAtivoPersistido || null) !== (grupoAtivoCorrigido || null)) {
+      await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: { grupoAtivoId: grupoAtivoCorrigido },
+      });
+    }
+
     const contextoPrimario = vinculoAtivo || vinculosAceitos[0] || vinculosRelevantes[0] || null;
     const papelGlobal = usuario.papelGlobal || "usuario";
     const adminSistema = papelGlobal === "adminSistema";
-    const grupoAtivoId = vinculoAtivo?.grupoId || null;
 
     return {
       id: usuario.id,
@@ -143,8 +151,8 @@ function createSessionService(prisma) {
       ativo: Boolean(usuario.ativo),
       desativadoEm: usuario.desativadoEm || null,
       excluidoEm: usuario.excluidoEm || null,
-      grupoId: grupoAtivoId,
-      grupoAtivoId,
+      grupoId: grupoAtivoCorrigido,
+      grupoAtivoId: grupoAtivoCorrigido,
       grupoNome: vinculoAtivo?.grupo?.nome || contextoPrimario?.grupo?.nome || null,
       grupoCodigo: vinculoAtivo?.grupo?.codigo || contextoPrimario?.grupo?.codigo || null,
       papel: vinculoAtivo?.papel || null,

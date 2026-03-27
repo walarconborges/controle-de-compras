@@ -11,16 +11,19 @@ module.exports = function registerGrupoRoutes(app, deps) {
     exigirAutenticacao,
     exigirPapel,
     exigirAdminSistema,
-    exigirGrupoAtivoAceito,
     obterGrupoIdSessao,
     idsSaoIguais,
     normalizarNomeGrupo,
     gerarCodigoGrupo,
   } = deps;
 
+  function ehAdminSistema(req) {
+    return Boolean(req.session.usuario?.adminSistema);
+  }
+
   app.get("/grupos", exigirAutenticacao, async (req, res, next) => {
     try {
-      if (req.session.usuario?.adminSistema) {
+      if (ehAdminSistema(req)) {
         const grupos = await prisma.grupo.findMany({
           where: { excluidoEm: null },
           orderBy: { id: "asc" },
@@ -47,7 +50,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
       const id = Number(req.params.id);
       const grupoIdSessao = obterGrupoIdSessao(req);
 
-      if (!idsSaoIguais(id, grupoIdSessao) && !req.session.usuario?.adminSistema) {
+      if (!idsSaoIguais(id, grupoIdSessao) && !ehAdminSistema(req)) {
         return res.status(403).json({ erro: "Acesso negado a outro grupo" });
       }
 
@@ -88,13 +91,19 @@ module.exports = function registerGrupoRoutes(app, deps) {
     }
   });
 
-  app.put("/grupos/:id", exigirAutenticacao, exigirGrupoAtivoAceito, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }), async (req, res, next) => {
+  app.put("/grupos/:id", exigirAutenticacao, validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
       const grupoIdSessao = obterGrupoIdSessao(req);
 
-      if (!idsSaoIguais(id, grupoIdSessao) && !req.session.usuario?.adminSistema) {
-        return res.status(403).json({ erro: "Acesso negado a outro grupo" });
+      if (!ehAdminSistema(req)) {
+        if (!req.session.usuario?.temGrupoAceito || req.session.usuario?.papel !== "adminGrupo") {
+          return res.status(403).json({ erro: "Acesso negado" });
+        }
+
+        if (!idsSaoIguais(id, grupoIdSessao)) {
+          return res.status(403).json({ erro: "Acesso negado a outro grupo" });
+        }
       }
 
       const grupo = await prisma.grupo.update({
