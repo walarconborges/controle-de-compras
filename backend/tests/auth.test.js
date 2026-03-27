@@ -1,9 +1,5 @@
 const { createTestApp, autenticarSessao } = require("./helpers/testApp");
-const {
-  criarPrismaMock,
-  criarSessaoUsuario,
-  criarUsuarioSessaoService,
-} = require("./helpers/testData");
+const { criarPrismaMock, criarSessaoUsuario, criarUsuarioSessaoService } = require("./helpers/testData");
 
 describe("Autenticação", () => {
   test("faz login com credenciais válidas e monta a sessão", async () => {
@@ -25,6 +21,7 @@ describe("Autenticação", () => {
         criarUsuarioSessaoService({
           id: 1,
           email: "will@example.com",
+          papelGlobal: "usuario",
         })
       );
 
@@ -36,10 +33,7 @@ describe("Autenticação", () => {
 
     const response = await request(app)
       .post("/login")
-      .send({
-        email: "will@example.com",
-        senha: "123456",
-      })
+      .send({ email: "will@example.com", senha: "123456" })
       .expect(200);
 
     expect(bcryptMock.compare).toHaveBeenCalledWith("123456", "hash-correta");
@@ -50,10 +44,7 @@ describe("Autenticação", () => {
 
   test("nega login com senha inválida", async () => {
     const prisma = criarPrismaMock();
-    const bcryptMock = {
-      compare: jest.fn().mockResolvedValue(false),
-      hash: jest.fn(),
-    };
+    const bcryptMock = { compare: jest.fn().mockResolvedValue(false), hash: jest.fn() };
 
     prisma.usuario.findUnique.mockResolvedValue({
       id: 1,
@@ -63,29 +54,19 @@ describe("Autenticação", () => {
       excluidoEm: null,
     });
 
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-      bcryptMock,
-    });
+    const { app, request } = createTestApp({ routes: ["auth"], prisma, bcryptMock });
 
     const response = await request(app)
       .post("/login")
-      .send({
-        email: "will@example.com",
-        senha: "errada",
-      })
+      .send({ email: "will@example.com", senha: "errada" })
       .expect(401);
 
     expect(response.body.erro).toBe("Credenciais inválidas");
   });
 
-  test("nega login de usuário desativado", async () => {
+  test("nega login de usuário inativo", async () => {
     const prisma = criarPrismaMock();
-    const bcryptMock = {
-      compare: jest.fn(),
-      hash: jest.fn(),
-    };
+    const bcryptMock = { compare: jest.fn(), hash: jest.fn() };
 
     prisma.usuario.findUnique.mockResolvedValue({
       id: 1,
@@ -95,31 +76,21 @@ describe("Autenticação", () => {
       excluidoEm: null,
     });
 
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-      bcryptMock,
-    });
+    const { app, request } = createTestApp({ routes: ["auth"], prisma, bcryptMock });
 
     const response = await request(app)
       .post("/login")
-      .send({
-        email: "will@example.com",
-        senha: "123456",
-      })
+      .send({ email: "will@example.com", senha: "123456" })
       .expect(403);
 
-    expect(response.body.erro).toBe("Usuário desativado");
+    expect(response.body.erro).toBe("Usuário inativo");
   });
 
   test("faz logout e invalida a sessão atual", async () => {
     const prisma = criarPrismaMock();
     prisma.usuario.findUnique.mockResolvedValue(criarUsuarioSessaoService());
 
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-    });
+    const { app, request } = createTestApp({ routes: ["auth"], prisma });
 
     const agent = request.agent(app);
     await autenticarSessao(agent, criarSessaoUsuario());

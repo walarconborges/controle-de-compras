@@ -1,6 +1,6 @@
 /**
- * Este arquivo guarda a lógica de montagem e atualização da sessão do usuário.
- * Ele existe para separar conta global, vínculos por grupo e grupo ativo escolhido.
+ * Monta e atualiza a sessão autenticada a partir do schema real.
+ * A sessão precisa refletir papel global, vínculo por grupo e grupo ativo persistido.
  */
 
 const STATUS_VINCULO_RELEVANTES = new Set([
@@ -39,6 +39,9 @@ function mapearVinculo(vinculo) {
     status: vinculo.status || null,
     solicitadoEm: vinculo.solicitadoEm || null,
     aprovadoEm: vinculo.aprovadoEm || null,
+    aprovadoPorEmail: vinculo.aprovadoPorEmail || null,
+    removidoEm: vinculo.removidoEm || null,
+    canceladoEm: vinculo.canceladoEm || null,
   };
 }
 
@@ -48,22 +51,27 @@ function createSessionService(prisma) {
   }
 
   async function montarSessaoUsuarioPorUsuarioId(usuarioId) {
-    const usuarioNumero = Number(usuarioId);
+    const id = Number(usuarioId);
 
-    if (!Number.isInteger(usuarioNumero) || usuarioNumero <= 0) {
+    if (!Number.isInteger(id) || id <= 0) {
       return null;
     }
 
     const usuario = await prisma.usuario.findUnique({
-      where: { id: usuarioNumero },
+      where: { id },
       select: {
         id: true,
         nome: true,
         sobrenome: true,
         email: true,
+        papelGlobal: true,
+        grupoAtivoId: true,
         ativo: true,
+        desativadoEm: true,
+        excluidoEm: true,
         usuariosGrupos: {
           where: {
+            excluidoEm: null,
             grupo: {
               is: {
                 excluidoEm: null,
@@ -78,6 +86,9 @@ function createSessionService(prisma) {
             status: true,
             solicitadoEm: true,
             aprovadoEm: true,
+            aprovadoPorEmail: true,
+            removidoEm: true,
+            canceladoEm: true,
             criadoEm: true,
             grupo: {
               select: {
@@ -93,7 +104,7 @@ function createSessionService(prisma) {
       },
     });
 
-    if (!usuario) {
+    if (!usuario || usuario.excluidoEm || !usuario.ativo) {
       return null;
     }
 
@@ -111,12 +122,18 @@ function createSessionService(prisma) {
 
     let vinculoAtivo = null;
 
-    if (vinculosAceitos.length === 1) {
+    if (usuario.grupoAtivoId) {
+      vinculoAtivo =
+        vinculosAceitos.find((vinculo) => Number(vinculo.grupoId) === Number(usuario.grupoAtivoId)) || null;
+    }
+
+    if (!vinculoAtivo && vinculosAceitos.length === 1) {
       vinculoAtivo = vinculosAceitos[0];
     }
 
     const contextoPrimario = vinculoAtivo || vinculosRelevantes[0] || null;
-    const adminSistema = false;
+    const papelGlobal = usuario.papelGlobal || "usuario";
+    const adminSistema = papelGlobal === "adminSistema";
 
     return {
       id: usuario.id,
@@ -124,11 +141,13 @@ function createSessionService(prisma) {
       sobrenome: usuario.sobrenome || "",
       nomeCompleto: montarNomeCompleto(usuario.nome, usuario.sobrenome),
       email: usuario.email || "",
-      papelGlobal: "usuario",
+      papelGlobal,
       adminSistema,
       ativo: Boolean(usuario.ativo),
+      desativadoEm: usuario.desativadoEm || null,
+      excluidoEm: usuario.excluidoEm || null,
       grupoId: vinculoAtivo?.grupoId || null,
-      grupoAtivoId: vinculoAtivo?.grupoId || null,
+      grupoAtivoId: vinculoAtivo?.grupoId || usuario.grupoAtivoId || null,
       grupoNome: vinculoAtivo?.grupo?.nome || contextoPrimario?.grupo?.nome || null,
       grupoCodigo: vinculoAtivo?.grupo?.codigo || contextoPrimario?.grupo?.codigo || null,
       papel: vinculoAtivo?.papel || null,

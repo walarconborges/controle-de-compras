@@ -27,19 +27,12 @@ document.addEventListener("DOMContentLoaded", function () {
       exibirMensagem("Carregando Painel do Sistema...", "muted");
       renderizarLoadingResumo();
       renderizarLoadingTabela(tbodyPendencias, 5, 3);
-      renderizarLoadingTabela(tbodyUsuarios, 5, 4);
-      renderizarLoadingTabela(tbodyGrupos, 4, 4);
-      renderizarLoadingTabela(tbodyLogs, 6, 5);
+      renderizarLoadingTabela(tbodyUsuarios, 5, 3);
+      renderizarLoadingTabela(tbodyGrupos, 4, 3);
+      renderizarLoadingTabela(tbodyLogs, 6, 4);
 
       await ensureAdminSistemaSession();
-      await Promise.all([
-        carregarResumo(),
-        carregarPendencias(),
-        carregarUsuarios(),
-        carregarGrupos(),
-        carregarLogs()
-      ]);
-
+      await Promise.all([carregarResumo(), carregarPendencias(), carregarUsuarios(), carregarGrupos(), carregarLogs()]);
       limparMensagem();
     } catch (error) {
       console.error(error);
@@ -60,12 +53,12 @@ document.addEventListener("DOMContentLoaded", function () {
       ["Grupos", data.grupos ?? 0],
       ["Itens", data.itens ?? 0],
       ["Pendências", data.pendencias ?? 0],
-      ["Logs", data.logs ?? 0]
+      ["Logs", data.logs ?? 0],
     ]);
   }
 
   async function carregarPendencias() {
-    renderizarLoadingTabela(tbodyPendencias, 5, 2);
+    renderizarLoadingTabela(tbodyPendencias, 5, 3);
     const { response, data } = await apiGet("/painel-sistema/pendencias");
 
     clearElement(tbodyPendencias);
@@ -98,6 +91,7 @@ document.addEventListener("DOMContentLoaded", function () {
           await apiPatch(`/painel-sistema/usuarios-grupos/${registro.id}/aprovar`, {});
           await carregarPendencias();
           await carregarResumo();
+          await carregarUsuarios();
         });
       }));
 
@@ -180,12 +174,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try {
       const params = new URLSearchParams();
-      if (filtroEntidade && filtroEntidade.value.trim()) params.set("entidade", filtroEntidade.value.trim());
-      if (filtroAcao && filtroAcao.value.trim()) params.set("acao", filtroAcao.value.trim());
-      if (filtroUsuario && filtroUsuario.value.trim()) params.set("usuarioId", filtroUsuario.value.trim());
+      if (filtroEntidade?.value.trim()) params.set("entidade", filtroEntidade.value.trim());
+      if (filtroAcao?.value.trim()) params.set("acao", filtroAcao.value.trim());
 
-      const queryString = params.toString();
-      const rota = queryString ? `/painel-sistema/logs?${queryString}` : "/painel-sistema/logs";
+      const filtroUsuarioValor = filtroUsuario?.value.trim() || "";
+      if (filtroUsuarioValor) {
+        if (/^\d+$/.test(filtroUsuarioValor)) {
+          params.set("usuarioId", filtroUsuarioValor);
+        } else {
+          params.set("autorEmail", filtroUsuarioValor);
+        }
+      }
+
+      const rota = params.toString() ? `/painel-sistema/logs?${params.toString()}` : "/painel-sistema/logs";
       const { response, data } = await apiGet(rota);
 
       clearElement(tbodyLogs);
@@ -203,10 +204,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
       logs.forEach(function (log) {
         const tr = document.createElement("tr");
+        const autorTexto = log.usuarioAutor
+          ? `${log.usuarioAutor.id} - ${[log.usuarioAutor.nome, log.usuarioAutor.sobrenome].filter(Boolean).join(" ")}`
+          : log.autorEmail || "-";
         tr.appendChild(createTextCell(formatarData(log.criadoEm)));
         tr.appendChild(createTextCell(log.entidade || "-"));
         tr.appendChild(createTextCell(log.acao || "-"));
-        tr.appendChild(createTextCell(log.usuarioAutor ? `${log.usuarioAutor.id} - ${log.usuarioAutor.nome}` : "-"));
+        tr.appendChild(createTextCell(autorTexto));
         tr.appendChild(createTextCell(log.grupo ? `${log.grupo.id} - ${log.grupo.nome}` : "-"));
         tr.appendChild(createTextCell(log.descricao || "-"));
         tbodyLogs.appendChild(tr);
@@ -214,7 +218,7 @@ document.addEventListener("DOMContentLoaded", function () {
     } finally {
       if (btnFiltrarLogs) {
         btnFiltrarLogs.disabled = false;
-        btnFiltrarLogs.textContent = "Filtrar logs";
+        btnFiltrarLogs.textContent = "Aplicar filtros";
       }
     }
   }
@@ -256,64 +260,56 @@ document.addEventListener("DOMContentLoaded", function () {
       ["Grupos", "Carregando..."],
       ["Itens", "Carregando..."],
       ["Pendências", "Carregando..."],
-      ["Logs", "Carregando..."]
+      ["Logs", "Carregando..."],
     ]);
   }
 
   function renderizarLoadingTabela(tbody, totalColunas, totalLinhas) {
-    if (!tbody) {
-      return;
-    }
+    if (!tbody) return;
 
     clearElement(tbody);
 
     for (let linha = 0; linha < totalLinhas; linha += 1) {
       const tr = document.createElement("tr");
-
       for (let coluna = 0; coluna < totalColunas; coluna += 1) {
         const td = document.createElement("td");
         td.className = "text-secondary";
         td.textContent = "Carregando...";
         tr.appendChild(td);
       }
-
       tbody.appendChild(tr);
     }
   }
 
   function ensurePainelMessage() {
-    const existente = document.getElementById("painel-message");
-    if (existente) {
-      return existente;
+    let elemento = document.getElementById("painel-message");
+
+    if (elemento) {
+      return elemento;
     }
 
-    const mensagem = document.createElement("div");
-    mensagem.id = "painel-message";
-    mensagem.className = "small mb-3";
-    mensagem.hidden = true;
-
-    const referencia = resumo && resumo.parentElement ? resumo.parentElement : document.body;
-    referencia.parentElement.insertBefore(mensagem, referencia);
-
-    return mensagem;
+    elemento = document.createElement("div");
+    elemento.id = "painel-message";
+    elemento.className = "small mt-3";
+    elemento.setAttribute("aria-live", "polite");
+    document.querySelector(".container")?.prepend(elemento);
+    return elemento;
   }
 
-  function exibirMensagem(texto, variante) {
-    setFeedbackMessage(painelMessage, texto, variante, {
-      classeBase: "small mb-3"
-    });
+  function exibirMensagem(texto, tipo = "muted") {
+    setFeedbackMessage(painelMessage, texto, tipo);
   }
 
   function limparMensagem() {
-    clearFeedbackMessage(painelMessage, {
-      classeBase: "small mb-3"
-    });
+    clearFeedbackMessage(painelMessage);
   }
 
   function formatarData(valor) {
     if (!valor) return "-";
-    const data = new Date(valor);
-    if (Number.isNaN(data.getTime())) return "-";
-    return data.toLocaleString("pt-BR");
+    try {
+      return new Date(valor).toLocaleString("pt-BR");
+    } catch {
+      return String(valor);
+    }
   }
 });

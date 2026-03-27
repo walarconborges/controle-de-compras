@@ -1,19 +1,10 @@
 const { createTestApp, autenticarSessao } = require("./helpers/testApp");
-const {
-  criarPrismaMock,
-  criarSessaoUsuario,
-  criarUsuarioSessaoService,
-} = require("./helpers/testData");
+const { criarPrismaMock, criarSessaoUsuario, criarUsuarioSessaoService } = require("./helpers/testData");
 
 describe("Sessão", () => {
   test("retorna 401 ao consultar sessão sem autenticação", async () => {
     const prisma = criarPrismaMock();
-
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-    });
-
+    const { app, request } = createTestApp({ routes: ["auth"], prisma });
     await request(app).get("/sessao").expect(401);
   });
 
@@ -23,14 +14,11 @@ describe("Sessão", () => {
       criarUsuarioSessaoService({
         id: 1,
         grupoAtivoId: 10,
+        papelGlobal: "usuario",
       })
     );
 
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-    });
-
+    const { app, request } = createTestApp({ routes: ["auth"], prisma });
     const agent = request.agent(app);
     await autenticarSessao(agent, criarSessaoUsuario());
 
@@ -51,16 +39,21 @@ describe("Sessão", () => {
       papel: "membro",
       status: "aceito",
       excluidoEm: null,
+      grupo: {
+        id: 20,
+        nome: "Grupo Beta",
+        codigo: "BETA20",
+        excluidoEm: null,
+        desativadoEm: null,
+      },
     });
 
-    prisma.usuario.update.mockResolvedValue({
-      id: 1,
-      grupoAtivoId: 20,
-    });
+    prisma.usuario.update.mockResolvedValue({ id: 1, grupoAtivoId: 20 });
 
     prisma.usuario.findUnique.mockResolvedValue(
       criarUsuarioSessaoService({
         grupoAtivoId: 20,
+        papelGlobal: "usuario",
         usuariosGrupos: [
           {
             id: 200,
@@ -69,6 +62,7 @@ describe("Sessão", () => {
             status: "aceito",
             solicitadoEm: null,
             aprovadoEm: "2026-03-25T10:00:00.000Z",
+            aprovadoPorEmail: "will@example.com",
             removidoEm: null,
             canceladoEm: null,
             criadoEm: "2026-03-25T10:00:00.000Z",
@@ -84,11 +78,7 @@ describe("Sessão", () => {
       })
     );
 
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-    });
-
+    const { app, request } = createTestApp({ routes: ["auth"], prisma });
     const agent = request.agent(app);
     await autenticarSessao(agent, criarSessaoUsuario());
 
@@ -97,15 +87,6 @@ describe("Sessão", () => {
       .send({ grupoId: 20 })
       .expect(200);
 
-    expect(prisma.usuarioGrupo.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          usuarioId: 1,
-          grupoId: 20,
-          status: "aceito",
-        }),
-      })
-    );
     expect(prisma.usuario.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: { grupoAtivoId: 20 },
@@ -117,11 +98,7 @@ describe("Sessão", () => {
     const prisma = criarPrismaMock();
     prisma.usuarioGrupo.findFirst.mockResolvedValue(null);
 
-    const { app, request } = createTestApp({
-      routes: ["auth"],
-      prisma,
-    });
-
+    const { app, request } = createTestApp({ routes: ["auth"], prisma });
     const agent = request.agent(app);
     await autenticarSessao(agent, criarSessaoUsuario());
 

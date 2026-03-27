@@ -1,5 +1,5 @@
 /**
- * Este arquivo registra rotas de grupos com exclusão lógica.
+ * Rotas de grupos com papéis consistentes e exclusão lógica.
  */
 const validateSchema = require("../middlewares/validateSchema");
 const { grupoIdParamSchema, grupoBodySchema } = require("../validators/grupoSchemas");
@@ -20,14 +20,21 @@ module.exports = function registerGrupoRoutes(app, deps) {
 
   app.get("/grupos", exigirAutenticacao, async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      if (req.session.usuario?.adminSistema) {
+        const grupos = await prisma.grupo.findMany({
+          where: { excluidoEm: null },
+          orderBy: { id: "asc" },
+        });
+        return res.json(grupos);
+      }
 
-      const grupos = grupoId
-        ? await prisma.grupo.findMany({
-            where: { id: grupoId, excluidoEm: null },
-            orderBy: { id: "asc" },
-          })
-        : [];
+      const grupoId = obterGrupoIdSessao(req);
+      if (!grupoId) return res.json([]);
+
+      const grupos = await prisma.grupo.findMany({
+        where: { id: grupoId, excluidoEm: null },
+        orderBy: { id: "asc" },
+      });
 
       res.json(grupos);
     } catch (error) {
@@ -81,7 +88,7 @@ module.exports = function registerGrupoRoutes(app, deps) {
     }
   });
 
-  app.put("/grupos/:id", exigirAutenticacao, exigirGrupoAtivoAceito, exigirPapel("adminGrupo"), validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }), async (req, res, next) => {
+  app.put("/grupos/:id", exigirAutenticacao, exigirGrupoAtivoAceito, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: grupoIdParamSchema, body: grupoBodySchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
       const grupoIdSessao = obterGrupoIdSessao(req);
