@@ -45,6 +45,13 @@ function mapearVinculo(vinculo) {
   };
 }
 
+/**
+ * Regra única do sistema:
+ * - se o grupo ativo salvo ainda for válido, mantém
+ * - se houver apenas 1 vínculo aceito válido, usa esse
+ * - se houver mais de 1 vínculo aceito válido e o salvo estiver inválido, zera
+ * - se não houver vínculo aceito válido, zera
+ */
 async function sincronizarGrupoAtivoPersistido(prisma, usuarioId, grupoAtivoPersistido, grupoAtivoCorrigido) {
   if ((grupoAtivoPersistido || null) === (grupoAtivoCorrigido || null)) {
     return;

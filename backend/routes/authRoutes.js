@@ -1,6 +1,6 @@
 /**
  * Rotas de cadastro, autenticação, sessão, perfil e vínculo do próprio usuário.
- * O arquivo alinha conta global, vínculo por grupo, grupo ativo e ações do Perfil.
+ * Este arquivo mantém conta global, vínculo por grupo, grupo ativo e ações do Perfil.
  */
 const validateSchema = require("../middlewares/validateSchema");
 const { loginRateLimit, cadastroRateLimit } = require("../middlewares/rateLimitMiddleware");
@@ -27,6 +27,13 @@ function parseGrupoId(valor) {
   return Number.isInteger(numero) && numero > 0 ? numero : null;
 }
 
+/**
+ * Regra única do sistema:
+ * - se o grupo ativo salvo ainda for válido, mantém
+ * - se houver apenas 1 vínculo aceito válido, usa esse
+ * - se houver mais de 1 vínculo aceito válido e o salvo estiver inválido, zera
+ * - se não houver vínculo aceito válido, zera
+ */
 async function sincronizarGrupoAtivoUsuario(prisma, usuarioId) {
   const usuarioNumero = Number(usuarioId);
 
@@ -60,9 +67,15 @@ async function sincronizarGrupoAtivoUsuario(prisma, usuarioId) {
     (vinculo) => Number(vinculo.grupoId) === Number(grupoAtivoAtual)
   );
 
-  const proximoGrupoAtivo = grupoAtivoPermaneceValido
-    ? grupoAtivoAtual
-    : vinculosAceitos[0]?.grupoId ?? null;
+  let proximoGrupoAtivo = null;
+
+  if (grupoAtivoPermaneceValido) {
+    proximoGrupoAtivo = grupoAtivoAtual;
+  } else if (vinculosAceitos.length === 1) {
+    proximoGrupoAtivo = vinculosAceitos[0].grupoId;
+  } else {
+    proximoGrupoAtivo = null;
+  }
 
   if (grupoAtivoAtual !== proximoGrupoAtivo) {
     await prisma.usuario.update({
@@ -270,6 +283,8 @@ module.exports = function registerAuthRoutes(app, deps) {
         return res.status(401).json({ erro: "Credenciais inválidas" });
       }
 
+      await sincronizarGrupoAtivoUsuario(prisma, usuario.id);
+
       const sessaoUsuario = await atualizarSessaoUsuario(req, usuario.id);
 
       if (!sessaoUsuario) {
@@ -287,6 +302,7 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.get("/sessao", exigirAutenticacao, async (req, res, next) => {
     try {
+      await sincronizarGrupoAtivoUsuario(prisma, req.session.usuario.id);
       const usuario = await atualizarSessaoUsuario(req, req.session.usuario.id);
 
       if (!usuario) {
@@ -301,6 +317,7 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.get("/meu-status-grupo", exigirAutenticacao, async (req, res, next) => {
     try {
+      await sincronizarGrupoAtivoUsuario(prisma, req.session.usuario.id);
       const usuario = await atualizarSessaoUsuario(req, req.session.usuario.id);
 
       res.json({
@@ -317,6 +334,7 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.get("/meu-perfil", exigirAutenticacao, async (req, res, next) => {
     try {
+      await sincronizarGrupoAtivoUsuario(prisma, req.session.usuario.id);
       const usuario = await atualizarSessaoUsuario(req, req.session.usuario.id);
 
       if (!usuario) {
@@ -447,7 +465,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     }
   });
 
-  app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res, next) => {
+  app.get("/meu-grupo/membros", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
       const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
