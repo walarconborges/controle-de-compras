@@ -465,7 +465,7 @@ module.exports = function registerAuthRoutes(app, deps) {
     }
   });
 
-  app.get("/meu-grupo/membros", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
+  app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res, next) => {
     try {
       const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
