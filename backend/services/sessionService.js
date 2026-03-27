@@ -45,6 +45,17 @@ function mapearVinculo(vinculo) {
   };
 }
 
+async function sincronizarGrupoAtivoPersistido(prisma, usuarioId, grupoAtivoPersistido, grupoAtivoCorrigido) {
+  if ((grupoAtivoPersistido || null) === (grupoAtivoCorrigido || null)) {
+    return;
+  }
+
+  await prisma.usuario.update({
+    where: { id: usuarioId },
+    data: { grupoAtivoId: grupoAtivoCorrigido },
+  });
+}
+
 function createSessionService(prisma) {
   if (!prisma?.usuario) {
     throw new Error("Prisma inválido ao criar sessionService.");
@@ -129,12 +140,7 @@ function createSessionService(prisma) {
 
     const grupoAtivoCorrigido = vinculoAtivo?.grupoId || null;
 
-    if ((grupoAtivoPersistido || null) !== (grupoAtivoCorrigido || null)) {
-      await prisma.usuario.update({
-        where: { id: usuario.id },
-        data: { grupoAtivoId: grupoAtivoCorrigido },
-      });
-    }
+    await sincronizarGrupoAtivoPersistido(prisma, usuario.id, grupoAtivoPersistido, grupoAtivoCorrigido);
 
     const contextoPrimario = vinculoAtivo || vinculosAceitos[0] || vinculosRelevantes[0] || null;
     const papelGlobal = usuario.papelGlobal || "usuario";

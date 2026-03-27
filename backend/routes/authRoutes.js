@@ -1,6 +1,6 @@
 /**
  * Rotas de cadastro, autenticação, sessão, perfil e vínculo do próprio usuário.
- * O arquivo precisa alinhar conta global, vínculo por grupo, grupo ativo e ações do Perfil.
+ * O arquivo alinha conta global, vínculo por grupo, grupo ativo e ações do Perfil.
  */
 const validateSchema = require("../middlewares/validateSchema");
 const { loginRateLimit, cadastroRateLimit } = require("../middlewares/rateLimitMiddleware");
@@ -20,6 +20,11 @@ function normalizarPapelGrupo(papel) {
   if (valor === "admin") return "adminGrupo";
   if (valor === "adminGrupo") return "adminGrupo";
   return "membro";
+}
+
+function parseGrupoId(valor) {
+  const numero = Number(valor);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
 }
 
 async function sincronizarGrupoAtivoUsuario(prisma, usuarioId) {
@@ -69,7 +74,6 @@ async function sincronizarGrupoAtivoUsuario(prisma, usuarioId) {
   return proximoGrupoAtivo;
 }
 
-
 module.exports = function registerAuthRoutes(app, deps) {
   const {
     prisma,
@@ -85,6 +89,28 @@ module.exports = function registerAuthRoutes(app, deps) {
     exigirPapel,
     obterGrupoIdSessao,
   } = deps;
+
+  function ehAdminSistema(req) {
+    return Boolean(req.session?.usuario?.adminSistema);
+  }
+
+  function obterGrupoAlvo(req, { obrigatorio = true, preferirBody = false } = {}) {
+    const grupoIdSessao = parseGrupoId(obterGrupoIdSessao(req));
+
+    if (!ehAdminSistema(req)) {
+      return grupoIdSessao;
+    }
+
+    const grupoIdBody = preferirBody ? parseGrupoId(req.body?.grupoId) : null;
+    const grupoIdQuery = parseGrupoId(req.query?.grupoId);
+    const grupoId = grupoIdBody || grupoIdQuery || grupoIdSessao || null;
+
+    if (!grupoId && obrigatorio) {
+      return null;
+    }
+
+    return grupoId;
+  }
 
   app.get("/grupos/sugestoes", validateSchema({ query: sugestoesGrupoQuerySchema }), async (req, res, next) => {
     try {
@@ -423,7 +449,7 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.get("/meu-grupo/membros", exigirAutenticacao, async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       if (!grupoId) {
         return res.json([]);
@@ -432,9 +458,16 @@ module.exports = function registerAuthRoutes(app, deps) {
       const vinculos = await prisma.usuarioGrupo.findMany({
         where: {
           grupoId,
+          status: "aceito",
           excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
         },
-        orderBy: [{ status: "asc" }, { papel: "asc" }, { id: "asc" }],
+        orderBy: [{ papel: "asc" }, { id: "asc" }],
         include: {
           usuario: {
             select: {
@@ -456,7 +489,7 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.get("/meu-grupo/solicitacoes", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: false });
 
       if (!grupoId) {
         return res.json([]);
@@ -467,6 +500,12 @@ module.exports = function registerAuthRoutes(app, deps) {
           grupoId,
           excluidoEm: null,
           status: { in: ["pendente", "convidado"] },
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
         },
         orderBy: { id: "asc" },
         include: {
@@ -491,10 +530,25 @@ module.exports = function registerAuthRoutes(app, deps) {
   app.patch("/meu-grupo/solicitacoes/:id/aceitar", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: solicitacaoIdParamSchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: true, preferirBody: true });
+
+      if (!grupoId) {
+        return res.status(400).json({ erro: "Grupo inválido para aceitar pendência" });
+      }
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, grupoId, excluidoEm: null, status: { in: ["pendente", "convidado"] } },
+        where: {
+          id,
+          grupoId,
+          excluidoEm: null,
+          status: { in: ["pendente", "convidado"] },
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
         include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } } },
       });
 
@@ -536,10 +590,25 @@ module.exports = function registerAuthRoutes(app, deps) {
   app.patch("/meu-grupo/solicitacoes/:id/recusar", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), validateSchema({ params: solicitacaoIdParamSchema }), async (req, res, next) => {
     try {
       const id = Number(req.params.id);
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: true, preferirBody: true });
+
+      if (!grupoId) {
+        return res.status(400).json({ erro: "Grupo inválido para recusar pendência" });
+      }
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, grupoId, excluidoEm: null, status: { in: ["pendente", "convidado"] } },
+        where: {
+          id,
+          grupoId,
+          excluidoEm: null,
+          status: { in: ["pendente", "convidado"] },
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
         include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } } },
       });
 
@@ -549,9 +618,11 @@ module.exports = function registerAuthRoutes(app, deps) {
 
       const atualizado = await prisma.usuarioGrupo.update({
         where: { id },
-        data: { status: "recusado" },
+        data: { status: "recusado", canceladoEm: new Date() },
         include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } } },
       });
+
+      await sincronizarGrupoAtivoUsuario(prisma, atualizado.usuario.id);
 
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",
@@ -574,12 +645,27 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.patch("/meu-grupo/membros/:usuarioId/papel", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: true, preferirBody: true });
       const usuarioId = Number(req.params.usuarioId);
       const papel = normalizarPapelGrupo(req.body?.papel);
 
+      if (!grupoId) {
+        return res.status(400).json({ erro: "Grupo inválido para alterar papel" });
+      }
+
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { grupoId, usuarioId, status: "aceito", excluidoEm: null },
+        where: {
+          grupoId,
+          usuarioId,
+          status: "aceito",
+          excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
       });
 
       if (!vinculo) {
@@ -616,15 +702,29 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.post("/meu-grupo/membros/:usuarioId/remover", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: true, preferirBody: true });
       const usuarioId = Number(req.params.usuarioId);
+
+      if (!grupoId) {
+        return res.status(400).json({ erro: "Grupo inválido para remover membro" });
+      }
 
       if (usuarioId === Number(req.session.usuario.id)) {
         return res.status(400).json({ erro: "Use a opção de sair do grupo para remover o próprio vínculo" });
       }
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { grupoId, usuarioId, excluidoEm: null },
+        where: {
+          grupoId,
+          usuarioId,
+          excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
       });
 
       if (!vinculo) {
@@ -667,7 +767,17 @@ module.exports = function registerAuthRoutes(app, deps) {
       }
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { grupoId, usuarioId, excluidoEm: null },
+        where: {
+          grupoId,
+          usuarioId,
+          excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
       });
 
       if (!vinculo) {
@@ -706,9 +816,22 @@ module.exports = function registerAuthRoutes(app, deps) {
 
   app.post("/meu-grupo/convites", exigirAutenticacao, exigirPapel("adminGrupo", "adminSistema"), async (req, res, next) => {
     try {
-      const grupoId = obterGrupoIdSessao(req);
+      const grupoId = obterGrupoAlvo(req, { obrigatorio: true, preferirBody: true });
       const email = normalizarEmail(req.body?.email);
       const papel = normalizarPapelGrupo(req.body?.papel);
+
+      if (!grupoId) {
+        return res.status(400).json({ erro: "Grupo inválido para convite" });
+      }
+
+      const grupo = await prisma.grupo.findFirst({
+        where: { id: grupoId, excluidoEm: null, desativadoEm: null },
+        select: { id: true },
+      });
+
+      if (!grupo) {
+        return res.status(404).json({ erro: "Grupo não encontrado" });
+      }
 
       const usuario = await prisma.usuario.findUnique({
         where: { email },
@@ -772,7 +895,18 @@ module.exports = function registerAuthRoutes(app, deps) {
       const usuarioId = Number(req.session.usuario.id);
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, usuarioId, status: "convidado", excluidoEm: null },
+        where: {
+          id,
+          usuarioId,
+          status: "convidado",
+          excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
       });
 
       if (!vinculo) {
@@ -815,7 +949,18 @@ module.exports = function registerAuthRoutes(app, deps) {
       const usuarioId = Number(req.session.usuario.id);
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, usuarioId, status: "convidado", excluidoEm: null },
+        where: {
+          id,
+          usuarioId,
+          status: "convidado",
+          excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
       });
 
       if (!vinculo) {
@@ -826,6 +971,8 @@ module.exports = function registerAuthRoutes(app, deps) {
         where: { id },
         data: { status: "recusado", canceladoEm: new Date() },
       });
+
+      await sincronizarGrupoAtivoUsuario(prisma, usuarioId);
 
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",
@@ -852,7 +999,18 @@ module.exports = function registerAuthRoutes(app, deps) {
       const usuarioId = Number(req.session.usuario.id);
 
       const vinculo = await prisma.usuarioGrupo.findFirst({
-        where: { id, usuarioId, status: "pendente", excluidoEm: null },
+        where: {
+          id,
+          usuarioId,
+          status: "pendente",
+          excluidoEm: null,
+          grupo: {
+            is: {
+              excluidoEm: null,
+              desativadoEm: null,
+            },
+          },
+        },
       });
 
       if (!vinculo) {
@@ -866,6 +1024,8 @@ module.exports = function registerAuthRoutes(app, deps) {
           canceladoEm: new Date(),
         },
       });
+
+      await sincronizarGrupoAtivoUsuario(prisma, usuarioId);
 
       await registrarAuditoria(prisma, req, {
         entidade: "usuario_grupo",
