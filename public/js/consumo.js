@@ -44,6 +44,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let historicoCompras = [];
   let movimentacoesEstoque = [];
+  let intervaloAtualizacao = null;
+  let carregandoDados = false;
 
   const filtrosConsumo = {
     item: "",
@@ -88,6 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
       popularCategoriasDinamicas();
       renderizarCompras();
       renderizarConsumo();
+      iniciarAtualizacaoAutomatica();
     } catch (error) {
       console.error("Erro ao inicializar consumo.js:", error);
       renderizarErroGeral("Não foi possível carregar os dados da página.");
@@ -183,6 +186,16 @@ document.addEventListener("DOMContentLoaded", function () {
         renderizarCompras();
       });
     }
+
+    window.addEventListener("focus", function () {
+      sincronizarDadosEReaplicarTela();
+    });
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") {
+        sincronizarDadosEReaplicarTela();
+      }
+    });
   }
 
   function configurarTabs() {
@@ -223,6 +236,38 @@ document.addEventListener("DOMContentLoaded", function () {
       movimentacoesEstoque = normalizarMovimentacoes(extractListFromResponse(respostaMovimentacoes.data, ["data", "items", "resultado", "resultados", "movimentacoes", "movimentacoesEstoque", "registros", "lista"]));
     } else {
       movimentacoesEstoque = [];
+    }
+  }
+
+  function iniciarAtualizacaoAutomatica() {
+    if (intervaloAtualizacao) {
+      clearInterval(intervaloAtualizacao);
+    }
+
+    intervaloAtualizacao = window.setInterval(function () {
+      sincronizarDadosEReaplicarTela(false);
+    }, 5000);
+  }
+
+  async function sincronizarDadosEReaplicarTela(forcar = true) {
+    if (carregandoDados) {
+      return;
+    }
+
+    if (!forcar && document.visibilityState === "hidden") {
+      return;
+    }
+
+    try {
+      carregandoDados = true;
+      await carregarDados();
+      popularCategoriasDinamicas();
+      renderizarCompras();
+      renderizarConsumo();
+    } catch (error) {
+      console.error("Erro ao sincronizar dados de consumo:", error);
+    } finally {
+      carregandoDados = false;
     }
   }
 

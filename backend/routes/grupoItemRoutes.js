@@ -182,22 +182,34 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
       const grupoItemExistente = await prisma.grupoItem.findFirst({ where: { id, grupoId }, include: { item: true } });
       if (!grupoItemExistente) return res.status(404).json({ erro: "Item do grupo não encontrado" });
 
+      const quantidadeAnterior = Number(grupoItemExistente.quantidade);
+      const quantidadeNova = Number(req.body.quantidade);
+      const diferenca = Math.abs(quantidadeNova - quantidadeAnterior);
+      const houveReducao = quantidadeNova < quantidadeAnterior;
+      const houveAumento = quantidadeNova > quantidadeAnterior;
+
       const grupoItem = await prisma.$transaction(async (tx) => {
         const atualizado = await tx.grupoItem.update({
           where: { id },
           data: { quantidade: req.body.quantidade },
           include: { item: { include: { categoria: true } }, grupo: true },
         });
-        await tx.movimentacaoEstoque.create({
-          data: {
-            grupoId,
-            itemId: atualizado.itemId,
-            usuarioId: req.session.usuario.id,
-            tipo: "ajuste_manual",
-            quantidade: req.body.quantidade,
-            motivo: `Ajuste manual de quantidade para ${atualizado.item.nome}`,
-          },
-        });
+
+        if (diferenca > 0) {
+          await tx.movimentacaoEstoque.create({
+            data: {
+              grupoId,
+              itemId: atualizado.itemId,
+              usuarioId: req.session.usuario.id,
+              tipo: houveReducao ? "consumo_manual" : "entrada_ajuste",
+              quantidade: diferenca,
+              motivo: houveReducao
+                ? `Consumo automático ao reduzir a quantidade de ${atualizado.item.nome}`
+                : `Entrada automática ao aumentar a quantidade de ${atualizado.item.nome}`,
+            },
+          });
+        }
+
         return atualizado;
       });
 
@@ -211,6 +223,8 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
         metadados: {
           quantidadeAnterior: String(grupoItemExistente.quantidade),
           quantidadeNova: String(grupoItem.quantidade),
+          diferenca: String(diferenca),
+          tipoMovimentacaoGerada: diferenca > 0 ? (houveReducao ? "consumo_manual" : "entrada_ajuste") : "nenhuma",
           autorEmail: req.session.usuario.email,
           rota: req.originalUrl,
         },
