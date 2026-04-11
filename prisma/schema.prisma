@@ -95,7 +95,6 @@ model Item {
   id            Int       @id @default(autoincrement())
   categoriaId   Int       @map("categoria_id")
   nome          String    @unique
-  unidadePadrao String    @map("unidade_padrao")
   desativadoEm  DateTime? @map("desativado_em")
   excluidoEm    DateTime? @map("excluido_em")
   criadoEm      DateTime  @default(now()) @map("criado_em")
@@ -151,7 +150,6 @@ model CompraItem {
   itemId        Int      @map("item_id")
   nomeItem      String   @map("nome_item")
   quantidade    Decimal  @db.Decimal(10, 2)
-  unidade       String
   valorUnitario Decimal? @map("valor_unitario") @db.Decimal(10, 2)
 
   compra Compra @relation(fields: [compraId], references: [id], onDelete: Cascade)

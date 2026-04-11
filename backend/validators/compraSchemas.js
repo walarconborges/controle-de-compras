@@ -7,7 +7,6 @@ const { z, quantidadePositivaSchema, valorCentavosNaoNegativoSchema } = require(
 const compraItemSchema = z.object({
   itemId: z.union([z.coerce.number().int().positive(), z.null()]).optional(),
   nome: z.string().trim().min(1, "nome inválido no item"),
-  unidade: z.string().trim().min(1, "unidade inválida no item"),
   categoria: z.string().trim().min(1, "categoria inválida no item"),
   quantidade: quantidadePositivaSchema,
   valorUnitarioCentavos: valorCentavosNaoNegativoSchema,

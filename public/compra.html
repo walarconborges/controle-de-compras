@@ -208,8 +208,7 @@
                 >
                   <span>Quantidade</span> <span class="sort-indicator" aria-hidden="true">↕</span>
                 </th>
-                <th scope="col">Unidade</th>
-                <th
+                                <th
                   scope="col"
                   id="ordenar-coluna-categoria-compra"
                   role="button"
@@ -226,7 +225,7 @@
             </thead>
             <tbody id="compra-tabela">
               <tr id="compra-estado-vazio">
-                <td colspan="7" class="text-center text-muted empty-state">
+                <td colspan="6" class="text-center text-muted empty-state">
                   Nenhuma compra montada até o momento.
                 </td>
               </tr>
@@ -245,7 +244,6 @@
           </td>
           <td class="item-nome"></td>
           <td class="item-quantidade cell-quantidade"></td>
-          <td class="item-unidade"></td>
           <td class="item-categoria"></td>
           <td class="item-valor-unitario"></td>
           <td class="item-subtotal"></td>
@@ -298,30 +296,6 @@
                   step="0.01"
                   placeholder="0"
                   required
-                >
-              </div>
-
-              <div class="col-md-3">
-                <label for="unidade-compra" class="form-label">Unidade</label>
-                <select class="form-select" id="unidade-compra" required>
-                  <option value="unidade(s)">unidade(s)</option>
-                  <option value="quilograma(s)">quilograma(s)</option>
-                  <option value="grama(s)">grama(s)</option>
-                  <option value="litro(s)">litro(s)</option>
-                  <option value="mililitro(s)">mililitro(s)</option>
-                  <option value="caixa(s)">caixa(s)</option>
-                  <option value="pacote(s)">pacote(s)</option>
-                  <option value="outro(s)">Outro</option>
-                </select>
-              </div>
-
-              <div class="col-md-6 d-none" id="unidade-outra-wrapper">
-                <label for="unidade-outra-compra" class="form-label">Outra unidade</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="unidade-outra-compra"
-                  placeholder="Digite a unidade"
                 >
               </div>
 

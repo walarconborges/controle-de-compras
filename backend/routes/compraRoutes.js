@@ -13,7 +13,6 @@ module.exports = function registerCompraRoutes(app, deps) {
     exigirAutenticacao,
     obterGrupoIdSessao,
     normalizarTextoSimples,
-    normalizarUnidade,
     decimalParaNumero,
     normalizarCompraResposta,
   } = deps;
@@ -72,7 +71,6 @@ module.exports = function registerCompraRoutes(app, deps) {
       const itensNormalizados = req.body.itens.map((item) => ({
         itemId: item.itemId ?? null,
         nome: normalizarTextoSimples(item.nome),
-        unidade: normalizarUnidade(item.unidade),
         categoria: normalizarTextoSimples(item.categoria),
         quantidade: item.quantidade,
         valorUnitarioCentavos: item.valorUnitarioCentavos,
@@ -90,7 +88,6 @@ module.exports = function registerCompraRoutes(app, deps) {
           const itemGlobal = await encontrarOuCriarItemTx(tx, {
             itemId: item.itemId,
             nome: item.nome,
-            unidade: item.unidade,
             categoriaNome: item.categoria,
           });
 
@@ -100,8 +97,7 @@ module.exports = function registerCompraRoutes(app, deps) {
               itemId: itemGlobal.id,
               nomeItem: itemGlobal.nome,
               quantidade: item.quantidade,
-              unidade: item.unidade,
-              valorUnitario: centsToDecimalString(item.valorUnitarioCentavos),
+                valorUnitario: centsToDecimalString(item.valorUnitarioCentavos),
             },
           });
 
@@ -262,9 +258,8 @@ module.exports = function registerCompraRoutes(app, deps) {
     }
   }
 
-  async function encontrarOuCriarItemTx(tx, { itemId, nome, unidade, categoriaNome }) {
+  async function encontrarOuCriarItemTx(tx, { itemId, nome, categoriaNome }) {
     const nomeNormalizado = normalizarTextoSimples(nome);
-    const unidadeNormalizada = normalizarUnidade(unidade);
     const categoriaNormalizada = normalizarTextoSimples(categoriaNome);
 
     if (itemId) {
@@ -299,7 +294,6 @@ module.exports = function registerCompraRoutes(app, deps) {
       item = await tx.item.create({
         data: {
           nome: nomeNormalizado,
-          unidadePadrao: unidadeNormalizada,
           categoriaId: categoria.id,
         },
         include: { categoria: true },

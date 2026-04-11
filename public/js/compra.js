@@ -13,9 +13,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const campoItem = document.getElementById("item-compra");
   const campoQuantidade = document.getElementById("quantidade-compra");
-  const campoUnidade = document.getElementById("unidade-compra");
-  const campoUnidadeOutraWrapper = document.getElementById("unidade-outra-wrapper");
-  const campoUnidadeOutra = document.getElementById("unidade-outra-compra");
 
   const campoCategoria = document.getElementById("categoria-compra");
   const campoNovaCategoriaWrapper = document.getElementById("nova-categoria-wrapper");
@@ -74,7 +71,6 @@ document.addEventListener("DOMContentLoaded", function () {
     !compraForm ||
     !campoItem ||
     !campoQuantidade ||
-    !campoUnidade ||
     !campoCategoria ||
     !campoValorUnitario ||
     !campoMensagem
@@ -111,7 +107,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     campoItem.addEventListener("input", function () {
       atualizarCategoriaPeloNomeDigitado();
-      atualizarUnidadePeloNomeDigitado();
       renderizarSugestoesItem(campoItem.value);
     });
 
@@ -122,10 +117,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     campoCategoria.addEventListener("change", alternarCampoCategoriaNova);
-
-    campoUnidade.addEventListener("change", function () {
-      alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
-    });
 
     compraForm.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -196,7 +187,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-
   async function verificarSessao() {
     await ensureAcceptedSession();
   }
@@ -239,7 +229,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const nome = String(campoItem.value || "").trim();
     const quantidade = normalizeNumber(campoQuantidade.value);
     const valorUnitarioCentavos = normalizeMoneyToCents(campoValorUnitario.value);
-    const unidade = obterUnidadeFormulario();
     const categoria = obterCategoriaFormulario();
 
     if (!nome) {
@@ -251,12 +240,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!Number.isFinite(quantidade) || quantidade <= 0) {
       exibirMensagem("Informe uma quantidade válida.", "warning");
       campoQuantidade.focus();
-      return;
-    }
-
-    if (!unidade) {
-      exibirMensagem("Informe a unidade.", "warning");
-      campoUnidade.focus();
       return;
     }
 
@@ -278,7 +261,6 @@ document.addEventListener("DOMContentLoaded", function () {
       itemId: itemGlobal ? Number(itemGlobal.id) : null,
       nome: nome,
       quantidade: quantidade,
-      unidade: unidade,
       categoria: categoria,
       valorUnitarioCentavos: valorUnitarioCentavos
     };
@@ -326,7 +308,6 @@ document.addEventListener("DOMContentLoaded", function () {
             itemId: item.itemId || null,
             nome: item.nome,
             quantidade: Number(item.quantidade),
-            unidade: item.unidade,
             valorUnitarioCentavos: Number(item.valorUnitarioCentavos),
             categoria: item.categoria
           };
@@ -381,7 +362,7 @@ document.addEventListener("DOMContentLoaded", function () {
       linhaVazia.id = "compra-estado-vazio";
 
       const celula = document.createElement("td");
-      celula.colSpan = 7;
+      celula.colSpan = 6;
       celula.className = "text-center text-muted empty-state";
       celula.textContent = itensCompra.length > 0
         ? "Nenhum item corresponde aos filtros aplicados."
@@ -437,9 +418,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const celulaQuantidade = document.createElement("td");
       celulaQuantidade.className = "item-quantidade cell-quantidade";
 
-      const celulaUnidade = document.createElement("td");
-      celulaUnidade.className = "item-unidade";
-
       const celulaCategoria = document.createElement("td");
       celulaCategoria.className = "item-categoria";
 
@@ -452,7 +430,6 @@ document.addEventListener("DOMContentLoaded", function () {
       linha.appendChild(celulaAcoes);
       linha.appendChild(celulaNome);
       linha.appendChild(celulaQuantidade);
-      linha.appendChild(celulaUnidade);
       linha.appendChild(celulaCategoria);
       linha.appendChild(celulaValorUnitario);
       linha.appendChild(celulaSubtotal);
@@ -466,13 +443,11 @@ document.addEventListener("DOMContentLoaded", function () {
     linha.dataset.item = normalizeText(item.nome);
     linha.dataset.categoria = normalizeText(item.categoria);
     linha.dataset.quantidade = String(Number(item.quantidade) || 0);
-    linha.dataset.unidade = normalizeText(item.unidade);
     linha.dataset.valorUnitarioCentavos = String(Number(item.valorUnitarioCentavos) || 0);
     linha.dataset.subtotal = String(subtotal);
 
     const celulaNome = linha.querySelector(".item-nome");
     const celulaQuantidade = linha.querySelector(".item-quantidade");
-    const celulaUnidade = linha.querySelector(".item-unidade");
     const celulaCategoria = linha.querySelector(".item-categoria");
     const celulaValorUnitario = linha.querySelector(".item-valor-unitario");
     const celulaSubtotal = linha.querySelector(".item-subtotal");
@@ -483,10 +458,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (celulaQuantidade) {
       celulaQuantidade.textContent = formatNumber(item.quantidade);
-    }
-
-    if (celulaUnidade) {
-      celulaUnidade.textContent = item.unidade || "—";
     }
 
     if (celulaCategoria) {
@@ -538,7 +509,6 @@ document.addEventListener("DOMContentLoaded", function () {
     campoQuantidade.value = formatFieldValue(item.quantidade);
     campoValorUnitario.value = formatFieldValueFromCents(item.valorUnitarioCentavos);
 
-    preencherCampoUnidade(item.unidade);
     preencherCampoCategoria(item.categoria);
 
     if (modalBootstrap) {
@@ -815,14 +785,6 @@ document.addEventListener("DOMContentLoaded", function () {
     return normalizeCategoryName(campoCategoria.value);
   }
 
-  function obterUnidadeFormulario() {
-    if (campoUnidade.value === "outro(s)") {
-      return String(campoUnidadeOutra.value || "").trim();
-    }
-
-    return String(campoUnidade.value || "").trim();
-  }
-
   function preencherCampoCategoria(valor) {
     const valorNormalizado = normalizeCategoryName(valor);
     const valorExisteNaLista = Array.from(campoCategoria.options).some(function (option) {
@@ -847,52 +809,8 @@ document.addEventListener("DOMContentLoaded", function () {
     campoNovaCategoria.value = valorNormalizado;
   }
 
-  function preencherCampoUnidade(valor) {
-    const valorNormalizado = String(valor || "").trim();
-    const valorExisteNaLista = Array.from(campoUnidade.options).some(function (option) {
-      return normalizeText(option.value) === normalizeText(valorNormalizado);
-    });
-
-    if (!valorNormalizado) {
-      campoUnidade.value = "";
-      campoUnidadeOutraWrapper.classList.add("d-none");
-      campoUnidadeOutra.required = false;
-      campoUnidadeOutra.value = "";
-      return;
-    }
-
-    if (valorExisteNaLista) {
-      campoUnidade.value = valorNormalizado;
-      campoUnidadeOutraWrapper.classList.add("d-none");
-      campoUnidadeOutra.required = false;
-      campoUnidadeOutra.value = "";
-      return;
-    }
-
-    campoUnidade.value = "outro(s)";
-    campoUnidadeOutraWrapper.classList.remove("d-none");
-    campoUnidadeOutra.required = true;
-    campoUnidadeOutra.value = valorNormalizado;
-  }
-
-  function alternarCampoOutro(selectElement, wrapperElement, inputElement) {
-    if (selectElement.value === "outro(s)") {
-      wrapperElement.classList.remove("d-none");
-      inputElement.required = true;
-    } else {
-      wrapperElement.classList.add("d-none");
-      inputElement.required = false;
-      inputElement.value = "";
-    }
-  }
-
   function limparFormulario() {
     compraForm.reset();
-
-    campoUnidade.value = "unidade(s)";
-    campoUnidadeOutraWrapper.classList.add("d-none");
-    campoUnidadeOutra.required = false;
-    campoUnidadeOutra.value = "";
 
     campoCategoria.value = "";
     campoNovaCategoriaWrapper.classList.add("d-none");
@@ -917,20 +835,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (itemCorrespondente && itemCorrespondente.categoria) {
       preencherCampoCategoria(itemCorrespondente.categoria.nome || itemCorrespondente.categoria);
-    }
-  }
-
-  function atualizarUnidadePeloNomeDigitado() {
-    const nome = String(campoItem.value || "").trim();
-
-    if (!nome) {
-      return;
-    }
-
-    const itemCorrespondente = buscarItemGlobalPorNome(nome);
-
-    if (itemCorrespondente && itemCorrespondente.unidadePadrao) {
-      preencherCampoUnidade(itemCorrespondente.unidadePadrao);
     }
   }
 
@@ -972,8 +876,7 @@ document.addEventListener("DOMContentLoaded", function () {
       botao.addEventListener("click", function () {
         campoItem.value = item.nome;
         atualizarCategoriaPeloNomeDigitado();
-        atualizarUnidadePeloNomeDigitado();
-        limparSugestoes();
+          limparSugestoes();
       });
       sugestoesItemContainer.appendChild(botao);
     });
@@ -990,7 +893,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return (
         Number(itemOriginal.itemId || 0) === Number(itemOrdenado.itemId || 0) &&
         normalizeText(itemOriginal.nome) === normalizeText(itemOrdenado.nome) &&
-        normalizeText(itemOriginal.unidade) === normalizeText(itemOrdenado.unidade) &&
         normalizeText(itemOriginal.categoria) === normalizeText(itemOrdenado.categoria) &&
         Number(itemOriginal.quantidade) === Number(itemOrdenado.quantidade) &&
         Number(itemOriginal.valorUnitarioCentavos) === Number(itemOrdenado.valorUnitarioCentavos)
@@ -1039,9 +941,6 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-
-
-
   function exibirMensagem(mensagem, tipo) {
     setFeedbackMessage(campoMensagem, mensagem, tipo);
   }
@@ -1067,8 +966,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     campoItem.disabled = salvando;
     campoQuantidade.disabled = salvando;
-    campoUnidade.disabled = salvando;
-    campoUnidadeOutra.disabled = salvando;
     campoCategoria.disabled = salvando;
     campoNovaCategoria.disabled = salvando;
     campoValorUnitario.disabled = salvando;

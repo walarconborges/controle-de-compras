@@ -20,7 +20,6 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     exigirAutenticacao,
     obterGrupoIdSessao,
     normalizarTextoSimples,
-    normalizarUnidade,
   } = deps;
 
   app.get("/grupo-itens", exigirAutenticacao, async (req, res, next) => {
@@ -73,13 +72,12 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
       const itemIdNumero = req.body.itemId ?? null;
       const nome = normalizarTextoSimples(req.body.nome);
-      const unidade = normalizarUnidade(req.body.unidade);
       const categoria = normalizarTextoSimples(req.body.categoria);
       const quantidadeNumero = req.body.quantidade;
       const comprarBooleano = req.body.comprar;
 
       const grupoItem = await prisma.$transaction(async (tx) => {
-        const itemGlobal = await encontrarOuCriarItemTx(tx, { itemId: itemIdNumero, nome, unidade, categoriaNome: categoria });
+        const itemGlobal = await encontrarOuCriarItemTx(tx, { itemId: itemIdNumero, nome, categoriaNome: categoria });
         const grupoItemExistente = await tx.grupoItem.findUnique({
           where: { grupoId_itemId: { grupoId, itemId: itemGlobal.id } },
           include: { item: { include: { categoria: true } }, grupo: true },
@@ -262,9 +260,8 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
     }
   }
 
-  async function encontrarOuCriarItemTx(tx, { itemId, nome, unidade, categoriaNome }) {
+  async function encontrarOuCriarItemTx(tx, { itemId, nome, categoriaNome }) {
     const nomeNormalizado = normalizarTextoSimples(nome);
-    const unidadeNormalizada = normalizarUnidade(unidade);
     const categoriaNormalizada = normalizarTextoSimples(categoriaNome);
 
     if (itemId) {
@@ -281,7 +278,7 @@ module.exports = function registerGrupoItemRoutes(app, deps) {
 
     try {
       return await tx.item.create({
-        data: { nome: nomeNormalizado, unidadePadrao: unidadeNormalizada, categoriaId: categoria.id },
+        data: { nome: nomeNormalizado, categoriaId: categoria.id },
         include: { categoria: true },
       });
     } catch (error) {

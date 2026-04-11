@@ -11,7 +11,6 @@ const categoriaBodySchema = z.object({
 const itemBodySchema = z.object({
   nome: textoObrigatorio("nome do item", "O"),
   categoriaId: z.coerce.number().int().positive("categoriaId inválido"),
-  unidadePadrao: textoObrigatorio("unidade padrão", "A"),
 });
 
 module.exports = {

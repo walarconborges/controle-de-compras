@@ -177,8 +177,7 @@
                   Item
                   <span class="sort-indicator" aria-hidden="true">↕</span>
                 </th>
-                <th scope="col">Unidade</th>
-                <th
+                                <th
                   scope="col"
                   class="sortable-header cell-quantidade"
                   id="ordenar-coluna-quantidade-estoque"
@@ -206,7 +205,7 @@
             </thead>
             <tbody id="estoque-tabela">
               <tr id="estoque-estado-vazio">
-                <td colspan="5" class="text-center text-muted empty-state">
+                <td colspan="4" class="text-center text-muted empty-state">
                   Nenhum item cadastrado até o momento.
                 </td>
               </tr>
@@ -257,35 +256,6 @@
               <div class="form-text">
                 O item precisa existir no catálogo global para ser adicionado ao estoque do grupo.
               </div>
-            </div>
-
-            <div class="mb-3">
-              <label for="item-unidade" class="form-label">Unidade</label>
-              <select class="form-select" id="item-unidade" name="item-unidade" required>
-                <option value="">Selecione</option>
-                <option value="unidade(s)" selected>unidade(s)</option>
-                <option value="quilograma(s)">quilograma(s)</option>
-                <option value="grama(s)">grama(s)</option>
-                <option value="litro(s)">litro(s)</option>
-                <option value="mililitro(s)">mililitro(s)</option>
-                <option value="pacote(s)">pacote(s)</option>
-                <option value="caixa(s)">caixa(s)</option>
-                <option value="garrafa(s)">garrafa(s)</option>
-                <option value="pote(s)">pote(s)</option>
-                <option value="vasilha(s)">vasilha(s)</option>
-                <option value="outro(s)">outro(s)</option>
-              </select>
-            </div>
-
-            <div class="mb-3 d-none" id="campo-unidade-outra-wrapper">
-              <label for="campo-unidade-outra" class="form-label">Digite a unidade</label>
-              <input
-                type="text"
-                class="form-control"
-                id="campo-unidade-outra"
-                name="campo-unidade-outra"
-                placeholder="Digite a unidade"
-              >
             </div>
 
             <div class="mb-3">
@@ -361,7 +331,7 @@
   </footer>
 
   <template id="template-linha-estoque">
-    <tr class="item-row" data-item="" data-categoria="" data-quantidade="" data-unidade="">
+    <tr class="item-row" data-item="" data-categoria="" data-quantidade="">
       <td class="cell-acoes">
         <div class="d-flex gap-2 flex-wrap">
           <button type="button" class="btn btn-outline-primary btn-sm btn-editar-estoque">
@@ -373,7 +343,6 @@
         </div>
       </td>
       <td class="item-nome"></td>
-      <td class="item-unidade"></td>
       <td class="item-quantidade cell-quantidade"></td>
       <td class="item-categoria"></td>
     </tr>

@@ -3,6 +3,7 @@
  * Ele existe para padronizar texto, números, dinheiro e respostas derivadas das entidades do sistema.
  */
 const { decimalValueToCents, decimalValueToString } = require("./money");
+
 function converterBoolean(valor) {
   if (typeof valor === "boolean") {
     return valor;
@@ -39,38 +40,6 @@ function normalizarDecimal(valor) {
 
 function normalizarTextoSimples(valor) {
   return String(valor || "").trim();
-}
-
-function normalizarUnidade(valor) {
-  const unidade = normalizarTextoSimples(valor).toLowerCase();
-
-  const mapa = {
-    kg: "quilograma(s)",
-    quilo: "quilograma(s)",
-    quilos: "quilograma(s)",
-    quilograma: "quilograma(s)",
-    quilogramas: "quilograma(s)",
-    g: "grama(s)",
-    grama: "grama(s)",
-    gramas: "grama(s)",
-    l: "litro(s)",
-    litro: "litro(s)",
-    litros: "litro(s)",
-    ml: "mililitro(s)",
-    mililitro: "mililitro(s)",
-    mililitros: "mililitro(s)",
-    unidade: "unidade(s)",
-    unidades: "unidade(s)",
-    "unidade(s)": "unidade(s)",
-    caixa: "caixa(s)",
-    caixas: "caixa(s)",
-    "caixa(s)": "caixa(s)",
-    pacote: "pacote(s)",
-    pacotes: "pacote(s)",
-    "pacote(s)": "pacote(s)",
-  };
-
-  return mapa[unidade] || normalizarTextoSimples(valor);
 }
 
 function normalizarEmail(valor) {
@@ -135,7 +104,6 @@ module.exports = {
   converterBoolean,
   normalizarDecimal,
   normalizarTextoSimples,
-  normalizarUnidade,
   normalizarEmail,
   normalizarNomeGrupo,
   nomeGrupoEhValido,

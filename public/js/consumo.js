@@ -203,7 +203,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-
   async function verificarSessao() {
     await ensureAcceptedSession();
   }
@@ -286,13 +285,6 @@ document.addEventListener("DOMContentLoaded", function () {
             ""
           );
 
-          const unidade = String(
-            item.unidade ||
-            item.item?.unidadePadrao ||
-            item.grupoItem?.item?.unidadePadrao ||
-            ""
-          ).trim();
-
           const quantidade = Number(item.quantidade) || 0;
           const valorUnitarioCentavos = Number.isInteger(Number(item.valorUnitarioCentavos))
             ? Number(item.valorUnitarioCentavos)
@@ -306,7 +298,6 @@ document.addEventListener("DOMContentLoaded", function () {
             nome: nome,
             categoria: categoria,
             quantidade: quantidade,
-            unidade: unidade,
             valorUnitarioCentavos: Number(valorUnitarioCentavos || 0),
             subtotalCentavos: subtotalCentavos
           };
@@ -330,14 +321,6 @@ document.addEventListener("DOMContentLoaded", function () {
         mov.nomeItem ||
         mov.nome ||
         mov.grupoItem?.item?.nome ||
-        ""
-      ).trim();
-
-      const unidade = String(
-        mov.item?.unidadePadrao ||
-        mov.unidade ||
-        mov.unidadeItem ||
-        mov.grupoItem?.item?.unidadePadrao ||
         ""
       ).trim();
 
@@ -371,7 +354,6 @@ document.addEventListener("DOMContentLoaded", function () {
         data: mov.criadoEm || mov.createdAt || mov.data || null,
         tipo: tipo,
         nome: nome,
-        unidade: unidade,
         categoria: categoria,
         variacao: variacao,
         quantidade: quantidade
@@ -673,7 +655,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       let chave = "";
       let nomeExibicao = "";
-      let unidadeExibicao = "";
       let categoriaExibicao = categoria;
 
       if (agrupamento === "categoria") {
@@ -681,21 +662,18 @@ document.addEventListener("DOMContentLoaded", function () {
         chave = normalizeText(nomeExibicao);
       } else {
         const nomeItem = String(mov.nome || "").trim();
-        const unidadeItem = String(mov.unidade || "").trim();
 
         if (!nomeItem) {
           return;
         }
 
         nomeExibicao = nomeItem;
-        unidadeExibicao = unidadeItem;
-        chave = `${normalizeText(nomeExibicao)}||${normalizeText(unidadeExibicao)}||${normalizeText(categoriaExibicao)}`;
+        chave = `${normalizeText(nomeExibicao)}||${normalizeText(categoriaExibicao)}`;
       }
 
       if (!grupos[chave]) {
         grupos[chave] = {
           nome: nomeExibicao,
-          unidade: unidadeExibicao,
           categoria: categoriaExibicao,
           dataInicial: dataMov,
           dataFinal: dataMov,
@@ -724,7 +702,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       return {
         nome: grupo.nome,
-        unidade: grupo.unidade,
         categoria: grupo.categoria,
         dataInicial: grupo.dataInicial,
         dataFinal: grupo.dataFinal,
@@ -996,7 +973,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const trHead = document.createElement("tr");
     trHead.appendChild(criarCabecalhoOrdenavel("ordenar-coluna-item-consumo", "Item", "consumo", "item", "Ordenar por item"));
-    trHead.appendChild(criarCabecalhoTexto("Unidade"));
     trHead.appendChild(criarCabecalhoOrdenavel("ordenar-coluna-categoria-consumo", "Categoria", "consumo", "categoria", "Ordenar por categoria"));
     trHead.appendChild(criarCabecalhoTexto("Data inicial"));
     trHead.appendChild(criarCabecalhoTexto("Data final"));
@@ -1019,7 +995,6 @@ document.addEventListener("DOMContentLoaded", function () {
       linha.dataset.quantidade = String(Number(grupo.consumoTotal) || 0);
 
       preencherCelula(linha, ".item-nome", grupo.nome);
-      preencherCelula(linha, ".item-unidade", grupo.unidade || "-");
       preencherCelula(linha, ".item-categoria", grupo.categoria || "Sem categoria");
       preencherCelula(linha, ".item-data-inicial", formatDate(grupo.dataInicial));
       preencherCelula(linha, ".item-data-final", formatDate(grupo.dataFinal));
@@ -1051,10 +1026,6 @@ document.addEventListener("DOMContentLoaded", function () {
       item.className = "list-group-item";
 
       item.appendChild(criarBlocoTexto("fw-semibold", grupo.nome));
-
-      if (agrupamento === "item") {
-        item.appendChild(criarBlocoTexto("small text-muted", grupo.unidade || "-"));
-      }
 
       item.appendChild(criarBlocoTexto("small text-muted", grupo.categoria || "Sem categoria"));
       item.appendChild(criarBlocoTexto("small", `Período: ${formatDate(grupo.dataInicial)} até ${formatDate(grupo.dataFinal)}`));
@@ -1410,10 +1381,6 @@ document.addEventListener("DOMContentLoaded", function () {
     updateCountLabel(elemento, quantidade, sufixo);
   }
 
-
-
-
-
   function formatDate(valor) {
     const data = new Date(valor);
 
@@ -1423,7 +1390,5 @@ document.addEventListener("DOMContentLoaded", function () {
 
     return data.toLocaleDateString("pt-BR");
   }
-
-
 
 });

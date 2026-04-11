@@ -13,9 +13,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const campoNome = document.getElementById("item-nome");
   const campoQuantidadeCadastro = document.getElementById("item-quantidade");
-  const campoUnidade = document.getElementById("item-unidade");
-  const campoUnidadeOutraWrapper = document.getElementById("campo-unidade-outra-wrapper");
-  const campoUnidadeOutra = document.getElementById("campo-unidade-outra");
 
   const campoCategoria = document.getElementById("item-categoria");
   const campoCategoriaOutraWrapper = document.getElementById("campo-categoria-outra-wrapper");
@@ -69,7 +66,6 @@ document.addEventListener("DOMContentLoaded", function () {
     !estoqueTabela ||
     !campoNome ||
     !campoQuantidadeCadastro ||
-    !campoUnidade ||
     !campoCategoria ||
     !campoMensagem
   ) {
@@ -135,13 +131,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     campoCategoria.addEventListener("change", alternarCampoCategoriaNova);
 
-    campoUnidade.addEventListener("change", function () {
-      alternarCampoOutro(campoUnidade, campoUnidadeOutraWrapper, campoUnidadeOutra);
-    });
-
     campoNome.addEventListener("input", function () {
       atualizarCategoriaPeloNomeDigitado();
-      atualizarUnidadePeloNomeDigitado();
       renderizarSugestoesItem(campoNome.value);
     });
 
@@ -183,7 +174,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-
   async function verificarSessao() {
     await ensureAcceptedSession();
   }
@@ -215,7 +205,6 @@ document.addEventListener("DOMContentLoaded", function () {
         grupoId: Number(registro.grupoId),
         itemId: Number(registro.itemId),
         nome: String(registro.item?.nome || "").trim(),
-        unidade: String(registro.item?.unidadePadrao || "").trim(),
         quantidade: Number(registro.quantidade) || 0,
         categoria: normalizeCategoryName(registro.item?.categoria?.nome || "")
       };
@@ -227,7 +216,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const nome = String(campoNome.value || "").trim();
     const quantidade = normalizeNumber(campoQuantidadeCadastro.value);
-    const unidade = obterUnidadeFormulario();
     const categoria = obterCategoriaFormulario();
 
     if (!nome) {
@@ -239,12 +227,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!Number.isFinite(quantidade) || quantidade < 0) {
       exibirMensagem("Informe uma quantidade válida.", "warning");
       campoQuantidadeCadastro.focus();
-      return;
-    }
-
-    if (!unidade) {
-      exibirMensagem("Informe a unidade.", "warning");
-      campoUnidade.focus();
       return;
     }
 
@@ -285,7 +267,6 @@ document.addEventListener("DOMContentLoaded", function () {
           corpo.itemId = Number(itemGlobal.id);
         } else {
           corpo.nome = nome;
-          corpo.unidade = unidade;
           corpo.categoria = categoria;
         }
 
@@ -427,7 +408,7 @@ document.addEventListener("DOMContentLoaded", function () {
       linhaVazia.id = "estoque-estado-vazio";
 
       const celula = document.createElement("td");
-      celula.colSpan = 5;
+      celula.colSpan = 4;
       celula.className = "text-center text-muted empty-state";
       celula.textContent = itensEstoque.length > 0
         ? "Nenhum item corresponde aos filtros aplicados."
@@ -474,9 +455,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const celulaNome = document.createElement("td");
       celulaNome.className = "item-nome";
 
-      const celulaUnidade = document.createElement("td");
-      celulaUnidade.className = "item-unidade";
-
       const celulaQuantidade = document.createElement("td");
       celulaQuantidade.className = "item-quantidade cell-quantidade";
 
@@ -485,7 +463,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       linha.appendChild(celulaAcoes);
       linha.appendChild(celulaNome);
-      linha.appendChild(celulaUnidade);
       linha.appendChild(celulaQuantidade);
       linha.appendChild(celulaCategoria);
     }
@@ -494,7 +471,6 @@ document.addEventListener("DOMContentLoaded", function () {
     linha.dataset.item = normalizeText(item.nome);
     linha.dataset.categoria = normalizeText(item.categoria);
     linha.dataset.quantidade = String(Number(item.quantidade) || 0);
-    linha.dataset.unidade = normalizeText(item.unidade);
 
     if (Number(item.quantidade) === 0) {
       linha.classList.add("is-zero", "status-danger");
@@ -508,16 +484,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function preencherLinhaTabela(linha, item) {
     const celulaNome = linha.querySelector(".item-nome");
-    const celulaUnidade = linha.querySelector(".item-unidade");
     const celulaQuantidade = linha.querySelector(".item-quantidade");
     const celulaCategoria = linha.querySelector(".item-categoria");
 
     if (celulaNome) {
       celulaNome.textContent = item.nome;
-    }
-
-    if (celulaUnidade) {
-      celulaUnidade.textContent = item.unidade || "—";
     }
 
     if (celulaQuantidade) {
@@ -605,13 +576,6 @@ document.addEventListener("DOMContentLoaded", function () {
     campoNome.value = item.nome;
     campoQuantidadeCadastro.value = formatFieldValue(item.quantidade);
 
-    preencherSelectOuOutro(
-      campoUnidade,
-      campoUnidadeOutraWrapper,
-      campoUnidadeOutra,
-      item.unidade
-    );
-
     preencherCampoCategoria(item.categoria || "");
     idEdicao = item.id;
 
@@ -646,40 +610,8 @@ document.addEventListener("DOMContentLoaded", function () {
     alternarCampoCategoriaNova();
   }
 
-  function preencherSelectOuOutro(selectElement, wrapperElement, inputElement, valor) {
-    const valorExisteNaLista = Array.from(selectElement.options).some(function (option) {
-      return option.value === valor;
-    });
-
-    if (!valor) {
-      selectElement.value = "";
-      wrapperElement.classList.add("d-none");
-      inputElement.required = false;
-      inputElement.value = "";
-      return;
-    }
-
-    if (valorExisteNaLista) {
-      selectElement.value = valor;
-      wrapperElement.classList.add("d-none");
-      inputElement.required = false;
-      inputElement.value = "";
-      return;
-    }
-
-    selectElement.value = "outro(s)";
-    wrapperElement.classList.remove("d-none");
-    inputElement.required = true;
-    inputElement.value = valor;
-  }
-
   function limparFormulario() {
     estoqueForm.reset();
-
-    campoUnidade.value = "unidade(s)";
-    campoUnidadeOutraWrapper.classList.add("d-none");
-    campoUnidadeOutra.required = false;
-    campoUnidadeOutra.value = "";
 
     campoCategoria.value = "";
     campoCategoriaOutraWrapper.classList.add("d-none");
@@ -917,31 +849,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function alternarCampoOutro(selectElement, wrapperElement, inputElement) {
-    if (selectElement.value === "outro(s)") {
-      wrapperElement.classList.remove("d-none");
-      inputElement.required = true;
-    } else {
-      wrapperElement.classList.add("d-none");
-      inputElement.required = false;
-      inputElement.value = "";
-    }
-  }
-
   function obterCategoriaFormulario() {
     if (campoCategoria.value === "__nova__") {
       return normalizeCategoryName(campoCategoriaOutra.value);
     }
 
     return normalizeCategoryName(campoCategoria.value);
-  }
-
-  function obterUnidadeFormulario() {
-    if (campoUnidade.value === "outro(s)") {
-      return String(campoUnidadeOutra.value || "").trim();
-    }
-
-    return String(campoUnidade.value || "").trim();
   }
 
   function atualizarCategoriaPeloNomeDigitado() {
@@ -954,24 +867,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const item = buscarItemGlobalPorNome(nome);
     if (item && item.categoria) {
       preencherCampoCategoria(item.categoria.nome || item.categoria);
-    }
-  }
-
-  function atualizarUnidadePeloNomeDigitado() {
-    const nome = String(campoNome.value || "").trim();
-
-    if (!nome || idEdicao) {
-      return;
-    }
-
-    const item = buscarItemGlobalPorNome(nome);
-    if (item && item.unidadePadrao) {
-      preencherSelectOuOutro(
-        campoUnidade,
-        campoUnidadeOutraWrapper,
-        campoUnidadeOutra,
-        item.unidadePadrao
-      );
     }
   }
 
@@ -1010,8 +905,7 @@ document.addEventListener("DOMContentLoaded", function () {
       botao.addEventListener("click", function () {
         campoNome.value = item.nome;
         atualizarCategoriaPeloNomeDigitado();
-        atualizarUnidadePeloNomeDigitado();
-        limparSugestoes();
+          limparSugestoes();
       });
 
       sugestoesItemContainer.appendChild(botao);
@@ -1086,8 +980,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     campoNome.disabled = salvando || Boolean(idEdicao);
-    campoUnidade.disabled = salvando || Boolean(idEdicao);
-    campoUnidadeOutra.disabled = salvando || Boolean(idEdicao);
     campoCategoria.disabled = salvando || Boolean(idEdicao);
     campoCategoriaOutra.disabled = salvando || Boolean(idEdicao);
     campoQuantidadeCadastro.disabled = salvando;
@@ -1100,12 +992,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     btnSalvar.textContent = idEdicao ? "Salvar alterações" : "Salvar item";
     campoNome.disabled = Boolean(idEdicao);
-    campoUnidade.disabled = Boolean(idEdicao);
-    campoUnidadeOutra.disabled = Boolean(idEdicao);
     campoCategoria.disabled = Boolean(idEdicao);
     campoCategoriaOutra.disabled = Boolean(idEdicao);
   }
-
 
   function ensureArray(valor) {
     return Array.isArray(valor) ? valor : [];

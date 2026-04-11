@@ -5,7 +5,6 @@
 const {
   z,
   idParamSchema,
-  textoObrigatorio,
   quantidadeNaoNegativaSchema,
   booleanSchema,
   booleanOpcionalSchema,
@@ -15,7 +14,6 @@ const grupoItemCreateBodySchema = z
   .object({
     itemId: z.union([z.coerce.number().int().positive(), z.null()]).optional(),
     nome: z.string().trim().optional().default(""),
-    unidade: z.string().trim().optional().default(""),
     categoria: z.string().trim().optional().default(""),
     quantidade: quantidadeNaoNegativaSchema,
     comprar: booleanOpcionalSchema,
@@ -24,10 +22,6 @@ const grupoItemCreateBodySchema = z
     if (dados.itemId == null) {
       if (!dados.nome) {
         ctx.addIssue({ code: "custom", path: ["nome"], message: "nome inválido" });
-      }
-
-      if (!dados.unidade) {
-        ctx.addIssue({ code: "custom", path: ["unidade"], message: "unidade inválida" });
       }
 
       if (!dados.categoria) {
