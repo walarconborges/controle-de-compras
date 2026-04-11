@@ -9,37 +9,6 @@
   <link rel="stylesheet" href="homepage.css">
 </head>
 <body>
-  <header>
-    <nav class="site-map-top">
-      <div class="container py-2">
-        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
-          <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
-            <button
-              type="button"
-              class="btn btn-outline-secondary btn-sm d-lg-none"
-              id="btn-menu-mobile"
-              aria-label="Abrir menu de navegação"
-              aria-controls="menu-lateral-homepage"
-              aria-expanded="false"
-            >
-              ☰ Menu
-            </button>
-
-            <a href="homepage.html" class="btn btn-primary btn-sm" aria-current="page">Home</a>
-            <a href="perfil.html" class="btn btn-outline-secondary btn-sm">Perfil</a>
-            <a href="painel-sistema.html" class="btn btn-outline-dark btn-sm" id="link-painel-sistema" hidden>Painel do Sistema</a>
-          </div>
-
-          <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="button" class="btn btn-outline-danger btn-sm" id="btn-logout">
-              Sair
-            </button>
-          </div>
-        </div>
-      </div>
-    </nav>
-  </header>
-
   <aside
     class="site-map-left"
     id="menu-lateral-homepage"
@@ -48,11 +17,7 @@
   >
     <div class="site-map-left-hover-area" aria-hidden="true"></div>
 
-    <div
-      class="site-map-left-content"
-      id="menu-lateral-conteudo"
-      tabindex="-1"
-    >
+    <div class="site-map-left-content" id="menu-lateral-conteudo" tabindex="-1">
       <div class="p-3">
         <div class="d-flex justify-content-between align-items-center mb-3 d-lg-none">
           <h2 class="h6 mb-0">Menu</h2>
@@ -71,8 +36,16 @@
         <div class="d-grid gap-2">
           <a href="homepage.html" class="btn btn-primary btn-sm" aria-current="page">Home</a>
           <a href="estoque.html" class="btn btn-outline-secondary btn-sm">Estoque</a>
-                    <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+          <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
           <a href="perfil.html" class="btn btn-outline-secondary btn-sm">Perfil</a>
+          <a href="painel-sistema.html" class="btn btn-outline-dark btn-sm" id="link-painel-sistema" hidden>Painel do Sistema</a>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-danger btn-sm" id="btn-logout">Sair</button>
         </div>
       </div>
     </div>
@@ -86,10 +59,23 @@
   ></div>
 
   <div class="container py-4">
+    <div class="mb-4 d-lg-none">
+      <button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        id="btn-menu-mobile"
+        aria-label="Abrir menu de navegação"
+        aria-controls="menu-lateral-homepage"
+        aria-expanded="false"
+      >
+        ☰ Menu
+      </button>
+    </div>
+
     <main class="home-main">
       <section aria-label="Acessos principais">
         <div class="row g-3">
-          <div class="col-sm-6 col-lg-4">
+          <div class="col-sm-6 col-lg-3">
             <a href="estoque.html" class="text-decoration-none text-reset">
               <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
                 <h1 class="h4 mb-0 text-center">Estoque</h1>
@@ -97,7 +83,7 @@
             </a>
           </div>
 
-          <div class="col-sm-6 col-lg-4">
+          <div class="col-sm-6 col-lg-3">
             <a href="compra.html" class="text-decoration-none text-reset">
               <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
                 <h2 class="h4 mb-0 text-center">Compra</h2>
@@ -105,7 +91,15 @@
             </a>
           </div>
 
-          <div class="col-sm-6 col-lg-4">
+          <div class="col-sm-6 col-lg-3">
+            <a href="consumo.html" class="text-decoration-none text-reset">
+              <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
+                <h2 class="h4 mb-0 text-center">Consumo</h2>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-sm-6 col-lg-3">
             <a href="perfil.html" class="text-decoration-none text-reset">
               <div class="app-box home-card h-100 d-flex align-items-center justify-content-center">
                 <h2 class="h4 mb-0 text-center">Perfil</h2>

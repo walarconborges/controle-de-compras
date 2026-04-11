@@ -9,30 +9,6 @@
   <link rel="stylesheet" href="estoque.css">
 </head>
 <body>
-  <header>
-    <nav class="site-map-top">
-      <div class="container py-2">
-        <div class="d-flex flex-wrap gap-2 justify-content-center align-items-center">
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm d-lg-none"
-            id="btn-menu-mobile"
-            aria-label="Abrir menu de navegação"
-            aria-controls="menu-lateral-estoque"
-            aria-expanded="false"
-          >
-            ☰ Menu
-          </button>
-
-          <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-          <a href="estoque.html" class="btn btn-primary btn-sm" aria-current="page">Estoque</a>
-                    <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-          <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-        </div>
-      </div>
-    </nav>
-  </header>
-
   <aside
     class="site-map-left"
     id="menu-lateral-estoque"
@@ -60,8 +36,9 @@
         <div class="d-grid gap-2">
           <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
           <a href="estoque.html" class="btn btn-primary btn-sm" aria-current="page">Estoque</a>
-                    <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
+          <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
           <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
+          <a href="perfil.html" class="btn btn-outline-secondary btn-sm">Perfil</a>
         </div>
       </div>
     </div>
@@ -75,6 +52,18 @@
   ></div>
 
   <div class="container py-4">
+    <div class="mb-4 d-lg-none">
+      <button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        id="btn-menu-mobile"
+        aria-label="Abrir menu de navegação"
+        aria-controls="menu-lateral-estoque"
+        aria-expanded="false"
+      >
+        ☰ Menu
+      </button>
+    </div>
     <main>
       <header class="mb-4">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -214,6 +203,7 @@
         </div>
       </section>
     </main>
+
   </div>
 
   <div
@@ -318,35 +308,6 @@
       </div>
     </div>
   </div>
-
-  <footer class="site-map-bottom mt-4">
-    <div class="container py-3">
-      <div class="d-flex flex-wrap gap-2 justify-content-center">
-        <a href="homepage.html" class="btn btn-outline-secondary btn-sm">Home</a>
-        <a href="estoque.html" class="btn btn-primary btn-sm" aria-current="page">Estoque</a>
-                <a href="compra.html" class="btn btn-outline-secondary btn-sm">Compra</a>
-        <a href="consumo.html" class="btn btn-outline-secondary btn-sm">Consumo</a>
-      </div>
-    </div>
-  </footer>
-
-  <template id="template-linha-estoque">
-    <tr class="item-row" data-item="" data-categoria="" data-quantidade="">
-      <td class="cell-acoes">
-        <div class="d-flex gap-2 flex-wrap">
-          <button type="button" class="btn btn-outline-primary btn-sm btn-editar-estoque">
-            Editar
-          </button>
-          <button type="button" class="btn btn-outline-danger btn-sm btn-excluir-estoque">
-            Excluir
-          </button>
-        </div>
-      </td>
-      <td class="item-nome"></td>
-      <td class="item-quantidade cell-quantidade"></td>
-      <td class="item-categoria"></td>
-    </tr>
-  </template>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="js/estoque.js"></script>
