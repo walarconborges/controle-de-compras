@@ -900,35 +900,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  function extractListFromResponse(valor) {
-    if (Array.isArray(valor)) {
-      return valor;
-    }
-
-    if (!valor || typeof valor !== "object") {
-      return [];
-    }
-
-    const chavesPossiveis = [
-      "data",
-      "items",
-      "resultado",
-      "resultados",
-      "lista",
-      "itens",
-      "categorias",
-      "grupoItens",
-      "grupo_itens"
-    ];
-
-    for (const chave of chavesPossiveis) {
-      if (Array.isArray(valor[chave])) {
-        return valor[chave];
-      }
-    }
-
-    return [];
-  }
 
   function normalizarItemCompra(valor) {
     const valorUnitarioCentavos = Number.isInteger(Number(valor?.valorUnitarioCentavos))

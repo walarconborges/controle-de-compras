@@ -186,15 +186,15 @@ document.addEventListener("DOMContentLoaded", function () {
     ]);
 
     itensEstoque = resGrupoItens && resGrupoItens.response.ok
-      ? normalizarGrupoItens(resGrupoItens.data)
+      ? normalizarGrupoItens(extractListFromResponse(resGrupoItens.data))
       : [];
 
     itensGlobais = resItens && resItens.response.ok
-      ? ensureArray(resItens.data)
+      ? extractListFromResponse(resItens.data)
       : [];
 
     categoriasGlobais = resCategorias && resCategorias.response.ok
-      ? ensureArray(resCategorias.data)
+      ? extractListFromResponse(resCategorias.data)
       : [];
   }
 
@@ -744,9 +744,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function configurarOrdenacaoPorCabecalho(elemento, campo) {
-    if (!elemento) {
+    if (!elemento || elemento.dataset.sortBound === "true") {
       return;
     }
+
+    elemento.dataset.sortBound = "true";
 
     function alternarOrdenacao() {
       if (estadoOrdenacao.campo === campo) {
@@ -916,51 +918,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (sugestoesItemContainer) {
       sugestoesItemContainer.textContent = "";
     }
-  }
-
-  function compareText(a, b) {
-    return String(a || "").localeCompare(String(b || ""), "pt-BR", {
-      sensitivity: "base"
-    });
-  }
-
-  function compareNumber(a, b) {
-    return (Number(a) || 0) - (Number(b) || 0);
-  }
-
-  function normalizeNumber(valor) {
-    const texto = String(valor || "")
-      .trim()
-      .replace(/\s+/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".");
-
-    return parseFloat(texto);
-  }
-
-  function normalizeText(valor) {
-    return String(valor || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-  }
-
-  function normalizeCategoryName(valor) {
-    return String(valor || "").trim().replace(/\s+/g, " ");
-  }
-
-  function formatFieldValue(valor) {
-    const numero = Number(valor);
-
-    if (!Number.isFinite(numero)) {
-      return "";
-    }
-
-    return numero.toLocaleString("pt-BR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
   }
 
   function exibirMensagem(mensagem, tipo) {
