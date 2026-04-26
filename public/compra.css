@@ -16,16 +16,6 @@ body.menu-mobile-open {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.site-map-top {
-  background-color: #ffffff;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.site-map-bottom {
-  background-color: #ffffff;
-  border-top: 1px solid #dee2e6;
-}
-
 .site-map-left {
   position: fixed;
   top: 0;

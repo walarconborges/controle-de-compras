@@ -36,16 +36,6 @@ a.text-reset:focus-visible .app-box {
   border-color: #cfe2ff;
 }
 
-.site-map-top {
-  background-color: #ffffff;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.site-map-bottom {
-  background-color: #ffffff;
-  border-top: 1px solid #dee2e6;
-}
-
 .site-map-left {
   position: fixed;
   top: 0;

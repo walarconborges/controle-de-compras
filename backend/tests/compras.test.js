@@ -29,12 +29,10 @@ describe("Compras", () => {
                 itemId: 30,
                 nomeItem: "Arroz",
                 quantidade: decimalFake(2),
-                unidade: "un",
                 valorUnitario: "10.37",
                 item: {
                   id: 30,
                   nome: "Arroz",
-                  unidadePadrao: "un",
                   categoria: {
                     id: 7,
                     nome: "Mercearia",
@@ -54,7 +52,6 @@ describe("Compras", () => {
           create: jest.fn().mockResolvedValue({
             id: 30,
             nome: "Arroz",
-            unidadePadrao: "un",
             categoria: {
               id: 7,
               nome: "Mercearia",
@@ -121,7 +118,6 @@ describe("Compras", () => {
           {
             itemId: null,
             nome: "Arroz",
-            unidade: "un",
             categoria: "Mercearia",
             quantidade: 2,
             valorUnitarioCentavos: 1037,
@@ -161,7 +157,6 @@ describe("Compras", () => {
           {
             itemId: null,
             nome: "Arroz",
-            unidade: "un",
             categoria: "Mercearia",
             quantidade: 1,
             valorUnitarioCentavos: 500,

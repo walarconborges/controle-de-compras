@@ -158,6 +158,21 @@ registerGrupoItemRoutes(app, deps);
 registerCompraRoutes(app, deps);
 registerSystemRoutes(app, deps);
 
+/**
+ * Servir frontend pela mesma origem do Express.
+ * Isso evita que o navegador tente chamar /login, /sessao, /itens etc.
+ * em outro servidor/porta quando o projeto for aberto sem o backend.
+ */
+app.use(express.static(PUBLIC_PATH));
+
+/**
+ * Página inicial servida pelo próprio Express.
+ * Ajuste para login.html se esse for o seu ponto de entrada preferido.
+ */
+app.get("/", (req, res) => {
+  res.sendFile(path.join(PUBLIC_PATH, "login.html"));
+});
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
